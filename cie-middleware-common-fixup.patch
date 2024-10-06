@@ -1,0 +1,139 @@
+From b886a637d21108ce562365e6e630ddd52f098414 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Fri, 4 Oct 2024 23:07:03 +0200
+Subject: [PATCH] Fixup printf and BYTE type
+
+Fix compiler complaints about printf not having a format string.
+Fix issue where BYTE keyword causes issues in finding the prototype.
+Use CryptoPP::byte where byte can be ambiguous.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/CSP/IAS.cpp               |  4 ++--
+ cie-pkcs11/PCSC/APDU.cpp             |  8 ++++----
+ cie-pkcs11/Util/log.cpp              |  4 +---
+ cie_sign_sdk/src/Crypto/CryptoUtil.h | 12 ++++++------
+ cie_sign_sdk/src/UUCLogger.cpp       |  2 +-
+ 5 files changed, 14 insertions(+), 16 deletions(-)
+
+diff --git a/cie-pkcs11/CSP/IAS.cpp b/cie-pkcs11/CSP/IAS.cpp
+index c7d4d14..7ccd379 100644
+--- a/cie-pkcs11/CSP/IAS.cpp
++++ b/cie-pkcs11/CSP/IAS.cpp
+@@ -653,11 +653,11 @@ ByteDynArray IAS::SM(ByteArray &keyEnc, ByteArray &keySig, ByteArray &apdu, Byte
+ 	init_func
+ 
+ 	std::string dmp;
+-	ODS(dumpHexData(seq, dmp).c_str());
++	ODS("%s\n", dumpHexData(seq, dmp).c_str());
+ 
+ 	increment(seq);
+ 
+-    ODS(dumpHexData(seq, dmp).c_str());
++    ODS("%s\n", dumpHexData(seq, dmp).c_str());
+ 
+ 	ByteDynArray smHead;
+ 	smHead = apdu.left(4);
+diff --git a/cie-pkcs11/PCSC/APDU.cpp b/cie-pkcs11/PCSC/APDU.cpp
+index e7325d2..3fd89b9 100644
+--- a/cie-pkcs11/PCSC/APDU.cpp
++++ b/cie-pkcs11/PCSC/APDU.cpp
+@@ -10,23 +10,23 @@
+ 
+ APDU::APDU()  {
+ }
+-APDU::APDU(BYTE CLA,BYTE INS,BYTE P1,BYTE P2,BYTE LC,BYTE *pData,BYTE LE)  {
++APDU::APDU(uint8_t CLA,uint8_t INS,uint8_t P1,uint8_t P2,uint8_t LC,uint8_t *pData,uint8_t LE)  {
+ 	init_func
+ 	if (LC>250) throw;
+ 	btINS=INS;btCLA=CLA;btP1=P1;btP2=P2;btLC=LC;pbtData=pData;btLE=LE;
+ 	bLC=true;bLE=true;
+ 	exit_func
+ }
+-APDU::APDU(BYTE CLA,BYTE INS,BYTE P1,BYTE P2,BYTE LC,BYTE *pData)   {
++APDU::APDU(uint8_t CLA,uint8_t INS,uint8_t P1,uint8_t P2,uint8_t LC,uint8_t *pData)   {
+ 	if (LC>251) throw;
+ 	btINS=INS;btCLA=CLA;btP1=P1;btP2=P2;btLC=LC;pbtData=pData;btLE=0;
+ 	bLC=true;bLE=false;
+ }
+-APDU::APDU(BYTE CLA,BYTE INS,BYTE P1,BYTE P2,BYTE LE)   {
++APDU::APDU(uint8_t CLA,uint8_t INS,uint8_t P1,uint8_t P2,uint8_t LE)   {
+ 	btINS=INS;btCLA=CLA;btP1=P1;btP2=P2;btLE=LE;btLC=0;
+ 	bLC=false;bLE=true;
+ }
+-APDU::APDU(BYTE CLA,BYTE INS,BYTE P1,BYTE P2)   {
++APDU::APDU(uint8_t CLA,uint8_t INS,uint8_t P1,uint8_t P2)   {
+ 	btINS=INS;btCLA=CLA;btP1=P1;btP2=P2;btLE=0;btLC=0;
+ 	bLC=false;bLE=false;
+ }
+diff --git a/cie-pkcs11/Util/log.cpp b/cie-pkcs11/Util/log.cpp
+index 829ad42..5e70b3c 100644
+--- a/cie-pkcs11/Util/log.cpp
++++ b/cie-pkcs11/Util/log.cpp
+@@ -51,9 +51,7 @@ void initLog(const char *moduleName, const char *iniFile,const char *version)
+ 
+ 	logGlobalVersion=version;
+ 	
+-	OutputDebugString("File INI:");
+-	OutputDebugString(iniFile);
+-	OutputDebugString("\n");
++	OutputDebugString("File INI: %s\n", iniFile);
+ 
+     UUCProperties settings;
+     //settings.load(iniFile);
+diff --git a/cie_sign_sdk/src/Crypto/CryptoUtil.h b/cie_sign_sdk/src/Crypto/CryptoUtil.h
+index 4c9a795..380f44b 100644
+--- a/cie_sign_sdk/src/Crypto/CryptoUtil.h
++++ b/cie_sign_sdk/src/Crypto/CryptoUtil.h
+@@ -20,14 +20,14 @@ using namespace CryptoPP;
+ 
+ int encrypt(std::string& message, std::string& ciphertext)
+ {
+-    byte key[ CryptoPP::AES::DEFAULT_KEYLENGTH ], iv[ CryptoPP::AES::BLOCKSIZE ];
++    CryptoPP::byte key[ CryptoPP::AES::DEFAULT_KEYLENGTH ], iv[ CryptoPP::AES::BLOCKSIZE ];
+     memset( key, 0x00, CryptoPP::AES::DEFAULT_KEYLENGTH );
+     memset( iv, 0x00, CryptoPP::AES::BLOCKSIZE );
+     
+     std::string enckey = ENCRYPTION_KEY;
+     
+-    byte digest[SHA1::DIGESTSIZE];
+-    CryptoPP::SHA1().CalculateDigest(digest, (byte*)enckey.c_str(), enckey.length());
++    CryptoPP::byte digest[SHA1::DIGESTSIZE];
++    CryptoPP::SHA1().CalculateDigest(digest, (CryptoPP::byte*)enckey.c_str(), enckey.length());
+     memcpy(key, digest, CryptoPP::AES::DEFAULT_KEYLENGTH );
+     //
+     // Create Cipher Text
+@@ -44,14 +44,14 @@ int encrypt(std::string& message, std::string& ciphertext)
+ 
+ int decrypt(std::string& ciphertext, std::string& message)
+ {
+-    byte key[ CryptoPP::AES::DEFAULT_KEYLENGTH ], iv[ CryptoPP::AES::BLOCKSIZE ];
++    CryptoPP::byte key[ CryptoPP::AES::DEFAULT_KEYLENGTH ], iv[ CryptoPP::AES::BLOCKSIZE ];
+     memset( key, 0x00, CryptoPP::AES::DEFAULT_KEYLENGTH );
+     memset( iv, 0x00, CryptoPP::AES::BLOCKSIZE );
+     
+     std::string enckey = ENCRYPTION_KEY;
+     
+-    byte digest[SHA1::DIGESTSIZE];
+-    CryptoPP::SHA1().CalculateDigest(digest, (byte*)enckey.c_str(), enckey.length());
++    CryptoPP::byte digest[SHA1::DIGESTSIZE];
++    CryptoPP::SHA1().CalculateDigest(digest, (CryptoPP::byte*)enckey.c_str(), enckey.length());
+     memcpy(key, digest, CryptoPP::AES::DEFAULT_KEYLENGTH );
+     
+     //
+diff --git a/cie_sign_sdk/src/UUCLogger.cpp b/cie_sign_sdk/src/UUCLogger.cpp
+index bb4ae56..f984fd0 100644
+--- a/cie_sign_sdk/src/UUCLogger.cpp
++++ b/cie_sign_sdk/src/UUCLogger.cpp
+@@ -102,7 +102,7 @@ void UUCLogger::log(const unsigned int nType, const char *szMsg, const unsigned
+     
+     char szLogMsg[5000];
+     sprintf(szLogMsg, "[%s], %d, %X, %s, %s\n", szTime, nType, nID, szModuleName, szMsg);
+-    printf(szLogMsg);
++    printf("%s\n", szLogMsg);
+     if(pfnCrashliticsLog != NULL)
+         pfnCrashliticsLog(szLogMsg);
+     
+-- 
+2.43.5
+

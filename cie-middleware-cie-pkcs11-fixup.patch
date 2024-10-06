@@ -1,0 +1,78 @@
+From e2a8d7f6e9e3552616cbfddbe99ca220d8772d17 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sat, 5 Oct 2024 00:13:40 +0200
+Subject: [PATCH] cie-pkcs11: Fix ambiguous 'byte' type
+
+Use CryptoPP::byte type instead of byte.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/CSP/AbilitaCIE.cpp  |  4 ++--
+ cie-pkcs11/Crypto/CryptoUtil.h | 12 ++++++------
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/cie-pkcs11/CSP/AbilitaCIE.cpp b/cie-pkcs11/CSP/AbilitaCIE.cpp
+index 2cb56fc..a12fabd 100644
+--- a/cie-pkcs11/CSP/AbilitaCIE.cpp
++++ b/cie-pkcs11/CSP/AbilitaCIE.cpp
+@@ -363,7 +363,7 @@ CK_RV CK_ENTRY AbilitaCIE(const char*  szPAN, const char*  szPIN, int* attempts,
+                         OID oid(attributes);
+                         if(oid == OID_GIVENNAME)
+                         {
+-                            byte tag = 0;
++                            CryptoPP::byte tag = 0;
+                             attributes.Peek(tag);
+                             
+                             CryptoPP::BERDecodeTextString(
+@@ -373,7 +373,7 @@ CK_RV CK_ENTRY AbilitaCIE(const char*  szPAN, const char*  szPIN, int* attempts,
+                         }
+                         else if(oid == OID_SURNAME)
+                         {
+-                            byte tag = 0;
++                            CryptoPP::byte tag = 0;
+                             attributes.Peek(tag);
+                             
+                             CryptoPP::BERDecodeTextString(
+diff --git a/cie-pkcs11/Crypto/CryptoUtil.h b/cie-pkcs11/Crypto/CryptoUtil.h
+index 91f1d1e..215fc59 100644
+--- a/cie-pkcs11/Crypto/CryptoUtil.h
++++ b/cie-pkcs11/Crypto/CryptoUtil.h
+@@ -20,14 +20,14 @@ using namespace CryptoPP;
+ 
+ int encrypt(std::string& message, std::string& ciphertext)
+ {
+-    byte key[ CryptoPP::AES::DEFAULT_KEYLENGTH ], iv[ CryptoPP::AES::BLOCKSIZE ];
++    CryptoPP::byte key[ CryptoPP::AES::DEFAULT_KEYLENGTH ], iv[ CryptoPP::AES::BLOCKSIZE ];
+     memset( key, 0x00, CryptoPP::AES::DEFAULT_KEYLENGTH );
+     memset( iv, 0x00, CryptoPP::AES::BLOCKSIZE );
+     
+     std::string enckey = ENCRYPTION_KEY;
+     
+-    byte digest[SHA1::DIGESTSIZE];
+-    CryptoPP::SHA1().CalculateDigest(digest, (byte*)enckey.c_str(), enckey.length());
++    CryptoPP::byte digest[SHA1::DIGESTSIZE];
++    CryptoPP::SHA1().CalculateDigest(digest, (CryptoPP::byte*)enckey.c_str(), enckey.length());
+     memcpy(key, digest, CryptoPP::AES::DEFAULT_KEYLENGTH );
+     //
+     // Create Cipher Text
+@@ -44,14 +44,14 @@ int encrypt(std::string& message, std::string& ciphertext)
+ 
+ int decrypt(std::string& ciphertext, std::string& message)
+ {
+-    byte key[ CryptoPP::AES::DEFAULT_KEYLENGTH ], iv[ CryptoPP::AES::BLOCKSIZE ];
++    CryptoPP::byte key[ CryptoPP::AES::DEFAULT_KEYLENGTH ], iv[ CryptoPP::AES::BLOCKSIZE ];
+     memset( key, 0x00, CryptoPP::AES::DEFAULT_KEYLENGTH );
+     memset( iv, 0x00, CryptoPP::AES::BLOCKSIZE );
+     
+     std::string enckey = ENCRYPTION_KEY;
+     
+-    byte digest[SHA1::DIGESTSIZE];
+-    CryptoPP::SHA1().CalculateDigest(digest, (byte*)enckey.c_str(), enckey.length());
++    CryptoPP::byte digest[SHA1::DIGESTSIZE];
++    CryptoPP::SHA1().CalculateDigest(digest, (CryptoPP::byte*)enckey.c_str(), enckey.length());
+     memcpy(key, digest, CryptoPP::AES::DEFAULT_KEYLENGTH );
+     
+     //
+-- 
+2.43.5
+

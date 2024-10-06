@@ -1,0 +1,85 @@
+From 7a840029e0b170aad1e0728f6e6e2c86c5cdd71e Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sun, 6 Oct 2024 23:39:12 +0200
+Subject: [PATCH] Fix segfault when creating session with token
+
+Specifically in cie-pkcs11/PKCS11/session.cpp the
+CSession::GetNewSessionID() causes a segfault.
+Bug fixed thanks to https://github.com/M0Rf30/cie-middleware-linux/blob/main/libs/pkcs11/src/PKCS11/session.cpp
+
+Also minor non-functional changes.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/PKCS11/session.cpp   |  3 ++-
+ cie-pkcs11/Sign/CIEVerify.cpp   |  2 ++
+ cie-pkcs11/Util/log.cpp         |  2 +-
+ cie_sign_sdk/src/disigonsdk.cpp | 10 +++++-----
+ 4 files changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/cie-pkcs11/PKCS11/session.cpp b/cie-pkcs11/PKCS11/session.cpp
+index 64a0539..0490bbc 100644
+--- a/cie-pkcs11/PKCS11/session.cpp
++++ b/cie-pkcs11/PKCS11/session.cpp
+@@ -78,7 +78,8 @@ namespace p11 {
+ 	CK_SLOT_ID CSession::GetNewSessionID() {
+ 		init_func
+ 		dwSessionCnt++;
+-		//return InterlockedIncrement(&dwSessionCnt);
++		__sync_fetch_and_add(&dwSessionCnt, 1);
++		return dwSessionCnt;
+ 	}
+ 
+ 	CK_SESSION_HANDLE CSession::AddSession(std::unique_ptr<CSession> pSession)
+diff --git a/cie-pkcs11/Sign/CIEVerify.cpp b/cie-pkcs11/Sign/CIEVerify.cpp
+index 16373e5..9a7ce9c 100644
+--- a/cie-pkcs11/Sign/CIEVerify.cpp
++++ b/cie-pkcs11/Sign/CIEVerify.cpp
+@@ -99,6 +99,8 @@ long CIEVerify::verify(const char* input_file, VERIFY_RESULT* verifyResult, cons
+ 	catch (long err) {
+ 		LOG_ERROR("CIEVerify::verify error: %lx", err);
+ 	}
++
++	return 0;
+ }
+ 
+ long CIEVerify::get_file_from_p7m(const char* input_file, const char* output_file){
+diff --git a/cie-pkcs11/Util/log.cpp b/cie-pkcs11/Util/log.cpp
+index 5e70b3c..78fa967 100644
+--- a/cie-pkcs11/Util/log.cpp
++++ b/cie-pkcs11/Util/log.cpp
+@@ -278,7 +278,7 @@ DWORD CLog::write(const char *format,...) {
+ 			}
+ 
+             switch(LogMode) {
+-                case (LM_Single) : fprintf(lf,"%s|%04i|%04i|%02i|", pbtDate, getpid(), dwThreadID, ModuleNum); break;
++                case (LM_Single) : fprintf(lf,"%s|%04i|%04lx|%02i|", pbtDate, getpid(), dwThreadID, ModuleNum); break;
+                 case (LM_Module) : fprintf(lf,"%s|%04i|%04lx|", pbtDate, getpid(), dwThreadID); break;
+                 case (LM_Thread) : fprintf(lf,"%s|%04i|%02i|", pbtDate, getpid(), ModuleNum); break;
+                 case (LM_Module_Thread) : fprintf(lf,"%s|", pbtDate); break;
+diff --git a/cie_sign_sdk/src/disigonsdk.cpp b/cie_sign_sdk/src/disigonsdk.cpp
+index 0459032..bf3185c 100644
+--- a/cie_sign_sdk/src/disigonsdk.cpp
++++ b/cie_sign_sdk/src/disigonsdk.cpp
+@@ -996,13 +996,13 @@ long disigon_get_file_from_p7m(DISIGON_CTX ctx) {
+ 
+ 
+ 
+-    int nFileType = pContext->nInputFileType;
++	int nFileType = pContext->nInputFileType;
+ 
+-    if(nFileType == DISIGON_FILETYPE_AUTO)
+-        nFileType = get_file_type(pContext->szInputFile);
++	if(nFileType == DISIGON_FILETYPE_AUTO)
++		nFileType = get_file_type(pContext->szInputFile);
+ 
+-    if(nFileType != DISIGON_FILETYPE_P7M)
+-        return DISIGON_ERROR_INVALID_FILE;
++	if(nFileType != DISIGON_FILETYPE_P7M)
++		return DISIGON_ERROR_INVALID_FILE;
+ 
+ 	UUCByteArray data;
+ 	BYTE buffer[BUFFERSIZE];
+-- 
+2.43.5
+

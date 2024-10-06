@@ -1,0 +1,119 @@
+From 58d928e9e59564b1309296319d3b0bde91e0d9e7 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sun, 6 Oct 2024 15:51:16 +0200
+Subject: [PATCH] Fix merging cie_sign_sdk and cie-pkcs11
+
+Merging serves the purpose of avoiding compilation errors and duplicate
+compilation of source files but introduces new issues that are addressed
+with this patch.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/Crypto/CryptoUtil.h        |  2 +-
+ cie-pkcs11/PKCS11/PKCS11Functions.cpp |  2 +-
+ cie-pkcs11/Util/CacheLib.cpp          |  2 +-
+ cie-pkcs11/Util/UUCByteArray.h        |  1 +
+ cie-pkcs11/Util/UtilException.h       |  1 +
+ cie_sign_sdk/include/UUCProperties.h  |  1 +
+ cie_sign_sdk/src/UUCProperties.cpp    | 10 ++++++++++
+ 7 files changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/cie-pkcs11/Crypto/CryptoUtil.h b/cie-pkcs11/Crypto/CryptoUtil.h
+index 321a61d..17646a4 100644
+--- a/cie-pkcs11/Crypto/CryptoUtil.h
++++ b/cie-pkcs11/Crypto/CryptoUtil.h
+@@ -12,7 +12,7 @@
+ #include <cryptopp/modes.h>
+ #include <cryptopp/aes.h>
+ #include <cryptopp/filters.h>
+-#include "../keys.h"
++#include "keys.h"
+ #include <cryptopp/sha.h>
+ #include <string>
+ 
+diff --git a/cie-pkcs11/PKCS11/PKCS11Functions.cpp b/cie-pkcs11/PKCS11/PKCS11Functions.cpp
+index 55ab71a..4135729 100755
+--- a/cie-pkcs11/PKCS11/PKCS11Functions.cpp
++++ b/cie-pkcs11/PKCS11/PKCS11Functions.cpp
+@@ -21,7 +21,7 @@
+ #include <mutex>
+ 
+ #include <cryptopp/misc.h>
+-#include "../Util/UUCByteArray.h"
++#include "../ASN1/UUCByteArray.h"
+ #include "../LOGGER/Logger.h"
+ 
+ using namespace CieIDLogger;
+diff --git a/cie-pkcs11/Util/CacheLib.cpp b/cie-pkcs11/Util/CacheLib.cpp
+index 76f4e7d..c91424c 100644
+--- a/cie-pkcs11/Util/CacheLib.cpp
++++ b/cie-pkcs11/Util/CacheLib.cpp
+@@ -21,7 +21,7 @@
+ #include <cryptopp/modes.h>
+ #include <cryptopp/aes.h>
+ #include <cryptopp/filters.h>
+-#include "../keys.h"
++#include "keys.h"
+ #include <cryptopp/sha.h>
+ 
+ #include <pwd.h>
+diff --git a/cie-pkcs11/Util/UUCByteArray.h b/cie-pkcs11/Util/UUCByteArray.h
+index 3440cf1..46a465f 100755
+--- a/cie-pkcs11/Util/UUCByteArray.h
++++ b/cie-pkcs11/Util/UUCByteArray.h
+@@ -18,6 +18,7 @@
+  */
+  
+ #pragma once
++#include "definitions.h"
+ #include "../PKCS11/wintypes.h"
+ 
+ #define ERR_INDEX_OUT_OF_BOUND    0xC0001001L
+diff --git a/cie-pkcs11/Util/UtilException.h b/cie-pkcs11/Util/UtilException.h
+index 1a3d4c0..4a1641e 100644
+--- a/cie-pkcs11/Util/UtilException.h
++++ b/cie-pkcs11/Util/UtilException.h
+@@ -19,6 +19,7 @@ public:
+ 
+ class scard_error : public logged_error {
+ public:
++	StatusWord sw;
+ 	scard_error(StatusWord sw);
+ };
+ 
+diff --git a/cie_sign_sdk/include/UUCProperties.h b/cie_sign_sdk/include/UUCProperties.h
+index 0160182..b4da393 100644
+--- a/cie_sign_sdk/include/UUCProperties.h
++++ b/cie_sign_sdk/include/UUCProperties.h
+@@ -27,6 +27,7 @@ public:
+ 	void putProperty(const char* szName, const char* szValue);
+ 	//void putProperty(char* szName, char* szValue);
+ 	const char* getProperty(const char* szName, const char* szDefaultValue = NULL) const;
++	int getIntProperty(const char* szName, int nDefaultValue = 0) const;
+ 	void remove(const char* szName);
+ 	void removeAll();
+ 
+diff --git a/cie_sign_sdk/src/UUCProperties.cpp b/cie_sign_sdk/src/UUCProperties.cpp
+index 98e0002..1fd7659 100644
+--- a/cie_sign_sdk/src/UUCProperties.cpp
++++ b/cie_sign_sdk/src/UUCProperties.cpp
+@@ -243,6 +243,16 @@ long UUCProperties::save(UUCByteArray& props, const char* szHeader) const
+ 	return 0;
+ }
+ 
++int UUCProperties::getIntProperty(const char* szName, int nDefaultValue /*= NULL*/) const
++{
++
++    const char* szVal = getProperty(szName, NULL);
++    if(szVal)
++        return strtol(szVal, NULL, 10);
++    else
++        return nDefaultValue;
++}
++
+ const char* UUCProperties::getProperty(const char* szName, const char* szDefaultValue /*= NULL*/) const
+ {
+ 	char* szValue;
+-- 
+2.43.5
+

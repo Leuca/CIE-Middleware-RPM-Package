@@ -1,0 +1,360 @@
+From 8d866118c50151a699d5849b587f7416b380f105 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sat, 5 Oct 2024 17:41:21 +0200
+Subject: [PATCH] cie-pkcs11: Fix cryptopp headers
+
+Include cryptopp headers from system path
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/CSP/AbilitaCIE.cpp         |  6 +++---
+ cie-pkcs11/CSP/IAS.cpp                |  9 ++++-----
+ cie-pkcs11/CSP/PINManager.cpp         |  2 +-
+ cie-pkcs11/Crypto/Base64.cpp          |  4 ++--
+ cie-pkcs11/Crypto/CryptoUtil.h        |  8 ++++----
+ cie-pkcs11/Crypto/DES3.cpp            |  2 +-
+ cie-pkcs11/Crypto/MAC.cpp             |  2 +-
+ cie-pkcs11/Crypto/RSA.cpp             |  6 +++---
+ cie-pkcs11/Crypto/RSA.h               |  2 +-
+ cie-pkcs11/Crypto/SHA256.cpp          |  6 +++---
+ cie-pkcs11/Crypto/SHA512.cpp          |  6 +++---
+ cie-pkcs11/PCSC/Token.cpp             |  2 +-
+ cie-pkcs11/PKCS11/CIEP11Template.cpp  |  4 ++--
+ cie-pkcs11/PKCS11/PKCS11Functions.cpp |  2 +-
+ cie-pkcs11/PKCS11/Slot.cpp            |  2 +-
+ cie-pkcs11/Util/Array.cpp             |  8 ++++----
+ cie-pkcs11/Util/CacheLib.cpp          | 10 +++++-----
+ cie-pkcs11/Util/CryptoppUtils.cpp     |  6 +++---
+ cie-pkcs11/Util/CryptoppUtils.h       |  6 +++---
+ cie-pkcs11/Util/IniSettings.cpp       |  2 +-
+ 20 files changed, 47 insertions(+), 48 deletions(-)
+
+diff --git a/cie-pkcs11/CSP/AbilitaCIE.cpp b/cie-pkcs11/CSP/AbilitaCIE.cpp
+index a12fabd..94fd225 100644
+--- a/cie-pkcs11/CSP/AbilitaCIE.cpp
++++ b/cie-pkcs11/CSP/AbilitaCIE.cpp
+@@ -18,13 +18,13 @@
+ #include <string>
+ #include "AbilitaCIE.h"
+ #include <string>
+-#include "../Cryptopp/misc.h"
++#include <cryptopp/misc.h>
+ 
+ #include "../Crypto/ASNParser.h"
+ #include <stdio.h>
+ #include "../Crypto/AES.h"
+-#include "../Cryptopp/cryptlib.h"
+-#include "../Cryptopp/asn.h"
++#include <cryptopp/cryptlib.h>
++#include <cryptopp/asn.h>
+ #include "../Util/CryptoppUtils.h"
+ #include "../Crypto/CryptoUtil.h"
+ #include "../Sign/CIESign.h"
+diff --git a/cie-pkcs11/CSP/IAS.cpp b/cie-pkcs11/CSP/IAS.cpp
+index 7ccd379..5ed8fa1 100644
+--- a/cie-pkcs11/CSP/IAS.cpp
++++ b/cie-pkcs11/CSP/IAS.cpp
+@@ -7,12 +7,11 @@
+ #include "../Crypto/SHA1.h"
+ #include "../Crypto/DES3.h"
+ #include "../Crypto/MAC.h"
+-#include "../Cryptopp/misc.h"
+ #include "../Util/ModuleInfo.h"
+-#include "../Cryptopp/misc.h"
+-#include "../Cryptopp/cryptlib.h"
+-#include "../Cryptopp/asn.h"
+-#include "../Cryptopp/queue.h"
++#include <cryptopp/misc.h>
++#include <cryptopp/cryptlib.h>
++#include <cryptopp/asn.h>
++#include <cryptopp/queue.h>
+ 
+ //#include "../res/resource.h"
+ #include "../Util/CacheLib.h"
+diff --git a/cie-pkcs11/CSP/PINManager.cpp b/cie-pkcs11/CSP/PINManager.cpp
+index 9b5b961..8bc2ce0 100644
+--- a/cie-pkcs11/CSP/PINManager.cpp
++++ b/cie-pkcs11/CSP/PINManager.cpp
+@@ -20,7 +20,7 @@
+ #include <string>
+ #include "AbilitaCIE.h"
+ #include <string>
+-#include "../Cryptopp/misc.h"
++#include <cryptopp/misc.h>
+ #include "../LOGGER/Logger.h"
+ 
+ using namespace CieIDLogger;
+diff --git a/cie-pkcs11/Crypto/Base64.cpp b/cie-pkcs11/Crypto/Base64.cpp
+index 6bb3fc6..7ee896c 100644
+--- a/cie-pkcs11/Crypto/Base64.cpp
++++ b/cie-pkcs11/Crypto/Base64.cpp
+@@ -1,8 +1,8 @@
+ 
+ #include "../PKCS11/wintypes.h"
+ #include "Base64.h"
+-#include "../Cryptopp/cryptlib.h"
+-#include "../Cryptopp/base64.h"
++#include <cryptopp/cryptlib.h>
++#include <cryptopp/base64.h>
+ 
+ //extern CLog Log;
+ 
+diff --git a/cie-pkcs11/Crypto/CryptoUtil.h b/cie-pkcs11/Crypto/CryptoUtil.h
+index 215fc59..321a61d 100644
+--- a/cie-pkcs11/Crypto/CryptoUtil.h
++++ b/cie-pkcs11/Crypto/CryptoUtil.h
+@@ -9,11 +9,11 @@
+ #ifndef CryptoUtil_h
+ #define CryptoUtil_h
+ 
+-#include "../Cryptopp/modes.h"
+-#include "../Cryptopp/aes.h"
+-#include "../Cryptopp/filters.h"
++#include <cryptopp/modes.h>
++#include <cryptopp/aes.h>
++#include <cryptopp/filters.h>
+ #include "../keys.h"
+-#include "../Cryptopp/sha.h"
++#include <cryptopp/sha.h>
+ #include <string>
+ 
+ using namespace CryptoPP;
+diff --git a/cie-pkcs11/Crypto/DES3.cpp b/cie-pkcs11/Crypto/DES3.cpp
+index 3ddc4b8..816027b 100644
+--- a/cie-pkcs11/Crypto/DES3.cpp
++++ b/cie-pkcs11/Crypto/DES3.cpp
+@@ -1,6 +1,6 @@
+ 
+ #include "DES3.h"
+-#include "../Cryptopp/misc.h"
++#include <cryptopp/misc.h>
+ 
+ //extern CLog Log;
+ 
+diff --git a/cie-pkcs11/Crypto/MAC.cpp b/cie-pkcs11/Crypto/MAC.cpp
+index d9dbca1..ddf37e8 100644
+--- a/cie-pkcs11/Crypto/MAC.cpp
++++ b/cie-pkcs11/Crypto/MAC.cpp
+@@ -1,6 +1,6 @@
+ 
+ #include "MAC.h"
+-#include "../Cryptopp/hmac.h"
++#include <cryptopp/hmac.h>
+ 
+ //extern CLog Log;
+ 
+diff --git a/cie-pkcs11/Crypto/RSA.cpp b/cie-pkcs11/Crypto/RSA.cpp
+index ac6e737..b520cd6 100644
+--- a/cie-pkcs11/Crypto/RSA.cpp
++++ b/cie-pkcs11/Crypto/RSA.cpp
+@@ -67,9 +67,9 @@ ByteDynArray CRSA::RSA_PURE(ByteArray &data)
+ 
+ #else
+ 
+-#include "../Cryptopp/rsa.h"
+-#include "../Cryptopp/secblock.h"
+-#include "../Cryptopp/pssr.h"
++#include <cryptopp/rsa.h>
++#include <cryptopp/secblock.h>
++#include <cryptopp/pssr.h>
+ 
+ using CryptoPP::InvertibleRSAFunction;
+ using CryptoPP::RSASS;
+diff --git a/cie-pkcs11/Crypto/RSA.h b/cie-pkcs11/Crypto/RSA.h
+index 6ddc774..2b4bd3b 100644
+--- a/cie-pkcs11/Crypto/RSA.h
++++ b/cie-pkcs11/Crypto/RSA.h
+@@ -4,7 +4,7 @@
+ #include <bcrypt.h>
+ #else
+ #include <openssl/rsa.h>
+-#include "../Cryptopp/rsa.h"
++#include <cryptopp/rsa.h>
+ #endif
+ #include "../PKCS11/wintypes.h"
+ #include "../Util/Array.h"
+diff --git a/cie-pkcs11/Crypto/SHA256.cpp b/cie-pkcs11/Crypto/SHA256.cpp
+index b38ccff..65cec1d 100644
+--- a/cie-pkcs11/Crypto/SHA256.cpp
++++ b/cie-pkcs11/Crypto/SHA256.cpp
+@@ -34,9 +34,9 @@ ByteDynArray CSHA256::Digest(ByteArray &data)
+ 
+ #else
+ 
+-#include "../Cryptopp/sha.h"
+-#include "../Cryptopp/filters.h"
+-#include "../Cryptopp/base64.h"
++#include <cryptopp/sha.h>
++#include <cryptopp/filters.h>
++#include <cryptopp/base64.h>
+ #include "../PKCS11/wintypes.h"
+ 
+ void CSHA256::Init() {
+diff --git a/cie-pkcs11/Crypto/SHA512.cpp b/cie-pkcs11/Crypto/SHA512.cpp
+index be47506..6c9a6ca 100644
+--- a/cie-pkcs11/Crypto/SHA512.cpp
++++ b/cie-pkcs11/Crypto/SHA512.cpp
+@@ -35,9 +35,9 @@ ByteDynArray CSHA512::Digest(ByteArray &data)
+ 
+ #else
+ 
+-#include "../Cryptopp/sha.h"
+-#include "../Cryptopp/filters.h"
+-#include "../Cryptopp/base64.h"
++#include <cryptopp/sha.h>
++#include <cryptopp/filters.h>
++#include <cryptopp/base64.h>
+ #include "../PKCS11/wintypes.h"
+ 
+ void CSHA512::Init() {
+diff --git a/cie-pkcs11/PCSC/Token.cpp b/cie-pkcs11/PCSC/Token.cpp
+index 9be94bd..5ba8e8e 100644
+--- a/cie-pkcs11/PCSC/Token.cpp
++++ b/cie-pkcs11/PCSC/Token.cpp
+@@ -3,7 +3,7 @@
+ #include "APDU.h"
+ #include "../Util/TLV.h"
+ #include <vector>
+-#include "../Cryptopp/misc.h"
++#include <cryptopp/misc.h>
+ 
+ //extern CLog Log;
+ 
+diff --git a/cie-pkcs11/PKCS11/CIEP11Template.cpp b/cie-pkcs11/PKCS11/CIEP11Template.cpp
+index cf86d4e..a4b2c3b 100755
+--- a/cie-pkcs11/PKCS11/CIEP11Template.cpp
++++ b/cie-pkcs11/PKCS11/CIEP11Template.cpp
+@@ -6,8 +6,8 @@
+ #include <stdio.h>
+ #include "../Crypto/AES.h"
+ #include "../PCSC/PCSC.h"
+-#include "../Cryptopp/cryptlib.h"
+-#include "../Cryptopp/asn.h"
++#include <cryptopp/cryptlib.h>
++#include <cryptopp/asn.h>
+ #include "../Util/CryptoppUtils.h"
+ #include "../LOGGER/Logger.h"
+ 
+diff --git a/cie-pkcs11/PKCS11/PKCS11Functions.cpp b/cie-pkcs11/PKCS11/PKCS11Functions.cpp
+index 397a60b..55ab71a 100755
+--- a/cie-pkcs11/PKCS11/PKCS11Functions.cpp
++++ b/cie-pkcs11/PKCS11/PKCS11Functions.cpp
+@@ -20,7 +20,7 @@
+ #include "../Util/SyncroEvent.h"
+ #include <mutex>
+ 
+-#include "../Cryptopp/misc.h"
++#include <cryptopp/misc.h>
+ #include "../Util/UUCByteArray.h"
+ #include "../LOGGER/Logger.h"
+ 
+diff --git a/cie-pkcs11/PKCS11/Slot.cpp b/cie-pkcs11/PKCS11/Slot.cpp
+index a1ef7cc..2110cdd 100755
+--- a/cie-pkcs11/PKCS11/Slot.cpp
++++ b/cie-pkcs11/PKCS11/Slot.cpp
+@@ -8,7 +8,7 @@
+ #include "../Util/util.h"
+ #include "../Util/SyncroEvent.h"
+ #include <mutex>
+-#include "../Cryptopp/misc.h"
++#include <cryptopp/misc.h>
+ #include "../LOGGER/Logger.h"
+ 
+ using namespace CieIDLogger;
+diff --git a/cie-pkcs11/Util/Array.cpp b/cie-pkcs11/Util/Array.cpp
+index 7ed58be..d5a53d9 100644
+--- a/cie-pkcs11/Util/Array.cpp
++++ b/cie-pkcs11/Util/Array.cpp
+@@ -1,9 +1,9 @@
+ #include "Array.h"
+ #include <fstream>
+-#include "../Cryptopp/cryptlib.h"
+-#include "../Cryptopp/misc.h"
+-#include "../Cryptopp/secblock.h"
+-#include "../Cryptopp/osrng.h"
++#include <cryptopp/cryptlib.h>
++#include <cryptopp/misc.h>
++#include <cryptopp/secblock.h>
++#include <cryptopp/osrng.h>
+ #include <openssl/rand.h>
+ //#include <windows.h>
+ //#include <bcrypt.h>
+diff --git a/cie-pkcs11/Util/CacheLib.cpp b/cie-pkcs11/Util/CacheLib.cpp
+index d74dd72..76f4e7d 100644
+--- a/cie-pkcs11/Util/CacheLib.cpp
++++ b/cie-pkcs11/Util/CacheLib.cpp
+@@ -8,7 +8,7 @@
+ //#include "sddl.h"
+ //#include "Aclapi.h"
+ //#include <VersionHelpers.h>
+-#include "../Cryptopp/misc.h"
++#include <cryptopp/misc.h>
+ #include "util.h"
+ 
+ //#ifndef WIN32
+@@ -18,11 +18,11 @@
+ #include <string>
+ #include <regex>
+ 
+-#include "../Cryptopp/modes.h"
+-#include "../Cryptopp/aes.h"
+-#include "../Cryptopp/filters.h"
++#include <cryptopp/modes.h>
++#include <cryptopp/aes.h>
++#include <cryptopp/filters.h>
+ #include "../keys.h"
+-#include "../Cryptopp/sha.h"
++#include <cryptopp/sha.h>
+ 
+ #include <pwd.h>
+ 
+diff --git a/cie-pkcs11/Util/CryptoppUtils.cpp b/cie-pkcs11/Util/CryptoppUtils.cpp
+index 40b02cc..a45de54 100644
+--- a/cie-pkcs11/Util/CryptoppUtils.cpp
++++ b/cie-pkcs11/Util/CryptoppUtils.cpp
+@@ -28,9 +28,9 @@
+ #include "CryptoppUtils.h"
+ #include <sstream>
+ 
+-#include "../Cryptopp/base64.h"
+-#include "../Cryptopp/hex.h"
+-#include "../Cryptopp/osrng.h"
++#include <cryptopp/base64.h>
++#include <cryptopp/hex.h>
++#include <cryptopp/osrng.h>
+ 
+ using namespace CryptoPP;
+ 
+diff --git a/cie-pkcs11/Util/CryptoppUtils.h b/cie-pkcs11/Util/CryptoppUtils.h
+index 979c04f..55c09db 100644
+--- a/cie-pkcs11/Util/CryptoppUtils.h
++++ b/cie-pkcs11/Util/CryptoppUtils.h
+@@ -30,9 +30,9 @@
+ 
+ #include <string>
+ 
+-#include "../Cryptopp/eccrypto.h"
+-#include "../Cryptopp/rsa.h"
+-#include "../Cryptopp/secblock.h"
++#include <cryptopp/eccrypto.h>
++#include <cryptopp/rsa.h>
++#include <cryptopp/secblock.h>
+ #include "../PKCS11/wintypes.h"
+ 
+ #define Buffer std::vector<unsigned char>
+diff --git a/cie-pkcs11/Util/IniSettings.cpp b/cie-pkcs11/Util/IniSettings.cpp
+index cd39b5a..cf529f0 100644
+--- a/cie-pkcs11/Util/IniSettings.cpp
++++ b/cie-pkcs11/Util/IniSettings.cpp
+@@ -1,7 +1,7 @@
+ #include "IniSettings.h"
+ #include "../Crypto/Base64.h"
+ #include <sstream>
+-#include "../Cryptopp/misc.h"
++#include <cryptopp/misc.h>
+ 
+ std::vector<IniSettings*> _iniSettings;
+ 
+-- 
+2.43.5
+
