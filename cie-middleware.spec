@@ -32,6 +32,9 @@ BuildRequires:	glibc
 BuildRequires:	libpng-devel
 BuildRequires:	libxml2-devel
 BuildRequires:	openssl-devel
+%if 0%{?fedora} >= 41
+BuildRequires:	openssl-devel-engine
+%endif
 BuildRequires:	podofo-devel
 BuildRequires:	zlib-devel
 BuildRequires:	fontconfig-devel
