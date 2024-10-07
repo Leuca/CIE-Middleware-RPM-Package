@@ -12,7 +12,6 @@ pkg_check_modules(FREETYPE REQUIRED freetype2)
 pkg_check_modules(PNG REQUIRED libpng)
 pkg_check_modules(LIBXML2 REQUIRED libxml-2.0)
 pkg_check_modules(OPENSSL REQUIRED openssl)
-pkg_check_modules(PODOFO REQUIRED libpodofo)
 pkg_check_modules(ZLIB REQUIRED zlib)
 pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 pkg_check_modules(PCSCLITE REQUIRED libpcsclite)
@@ -163,6 +162,7 @@ set(LIBCIE_INCLUDE_LIST
 	${LIBCIE_SOURCE_DIR}/Util
     ${LIBCIE_SOURCE_DIR}/PCSC
     ${LIBCIE_SOURCE_DIR}/Crypto
+    ${CMAKE_SOURCE_DIR}/podofo_lib/include
     )
 
 set(INCLUDE_LIST_SHARED
@@ -190,11 +190,10 @@ set(LIBRARIES_LIST
     z
     fontconfig
     pcsclite
-    podofo
     )
 
 add_library(${PROJECT_NAME} SHARED ${SDK_SRC_LIST} ${LIBCIE_SRC_LIST})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBRARIES_LIST})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBRARIES_LIST} -L${CMAKE_SOURCE_DIR}/podofo_lib/lib -l:libpodofo.a)
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_LIST_SHARED} ${LIBCIE_INCLUDE_LIST})
 
 include(GNUInstallDirs)

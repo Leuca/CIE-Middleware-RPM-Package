@@ -12,6 +12,7 @@ Source1:		CMakeLists.txt
 Source2:		logo.png
 Source3:		cieid.desktop
 Source4:		cieid.sh
+Source5:		https://github.com/podofo/podofo/archive/0.9.6/podofo-0.9.6.tar.gz
 
 Patch1:			cie-middleware-common-fixup.patch
 Patch2:			cie-middleware-cie-pkcs11-fixup.patch
@@ -36,12 +37,15 @@ BuildRequires:	openssl-devel
 %if 0%{?fedora} >= 41
 BuildRequires:	openssl-devel-engine
 %endif
-BuildRequires:	podofo-devel
 BuildRequires:	zlib-devel
 BuildRequires:	fontconfig-devel
 BuildRequires:	pcsc-lite-devel
 
 Requires:		java
+
+# Bundle PoDoFo to avoid fixing code where the available version is 10+
+# License: LGPL 2.0
+Provides:		bundled(podofo) = 0.9.6
 
 %description
 Middleware for CIE (Carta di Identità Elettronica).
@@ -75,6 +79,10 @@ rm -f cie-pkcs11/Util/UUC*
 cp -rf cie-pkcs11/* libcie/src/
 rm -f libcie/src/Sign/definitions.h
 
+# Unpack podofo
+tar xvf %{SOURCE5}
+mv podofo-0.9.6 podofo
+
 # Add our CMakeLists.txt for libcie-pkcs11
 install %{SOURCE1} CMakeLists.txt
 
@@ -84,6 +92,25 @@ sed -i 's/cryptopp/libcryptopp/g' CMakeLists.txt
 %endif
 
 %build
+# Build and fake-install PoDoFo
+export CXXFLAGS="%{optflags}"
+export LDFLAGS="%{build_ldflags}"
+%__cmake \
+		-S podofo \
+		-B podofo_build \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DPODOFO_BUILD_LIB_ONLY:BOOL=TRUE \
+		-DPODOFO_BUILD_STATIC:BOOL=TRUE \
+		-DCMAKE_CXX_FLAGS_RELEASE:STRING="-DNDEBUG" \
+		-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+		-DCMAKE_INSTALL_DO_STRIP:BOOL=OFF \
+		-DCMAKE_INSTALL_PREFIX:PATH=/ \
+		-DINCLUDE_INSTALL_DIR:PATH=/include	\
+		-DLIB_INSTALL_DIR:PATH=/
+%__cmake --build "podofo_build" -j$(nproc) --verbose
+mkdir podofo_lib
+DESTDIR=./podofo_lib %__cmake --install podofo_build
+
 # Build library
 %cmake
 %cmake_build
