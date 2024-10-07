@@ -21,6 +21,7 @@ Patch4:			cie-middleware-fix-cryptopp.patch
 Patch5:			cie-middleware-merge-fix.patch
 Patch6:			cie-middleware-fix-pkcs11.patch
 Patch7:			cie-middleware-fix-openssl.patch
+Patch8:			cie-middleware-fix-c++-std-headers.patch
 
 BuildRequires:	cmake
 BuildRequires:	ant
