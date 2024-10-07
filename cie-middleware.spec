@@ -89,7 +89,7 @@ install %{SOURCE1} CMakeLists.txt
 
 # Cryptopp pkg-config changed from cryptopp.pc to libcryptopp.pc since f39
 %if 0%{?fedora} > 38 || 0%{?rhel} > 9
-sed -i 's/cryptopp/libcryptopp/g' CMakeLists.txt
+sed -i '0,/cryptopp/s/cryptopp/libcryptopp/' CMakeLists.txt
 %endif
 
 %build
