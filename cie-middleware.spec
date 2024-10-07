@@ -19,6 +19,7 @@ Patch3:			cie-middleware-fix-podofo.patch
 Patch4:			cie-middleware-fix-cryptopp.patch
 Patch5:			cie-middleware-merge-fix.patch
 Patch6:			cie-middleware-fix-pkcs11.patch
+Patch7:			cie-middleware-fix-openssl.patch
 
 BuildRequires:	cmake
 BuildRequires:	ant
