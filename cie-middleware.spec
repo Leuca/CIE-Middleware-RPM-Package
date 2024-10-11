@@ -11,8 +11,8 @@ Source0:		https://github.com/italia/cie-middleware-linux/archive/%{version}/%{na
 Source1:		CMakeLists.txt
 Source2:		logo.png
 Source3:		cieid.desktop
-Source4:		cieid.sh
-Source5:		https://github.com/podofo/podofo/archive/0.9.6/podofo-0.9.6.tar.gz
+Source4:		https://github.com/podofo/podofo/archive/0.9.6/podofo-0.9.6.tar.gz
+Source5:		pom.xml
 
 Patch1:			cie-middleware-common-fixup.patch
 Patch2:			cie-middleware-cie-pkcs11-fixup.patch
@@ -23,10 +23,13 @@ Patch6:			cie-middleware-fix-pkcs11.patch
 Patch7:			cie-middleware-fix-openssl.patch
 Patch8:			cie-middleware-fix-c++-std-headers.patch
 
+%if 0%{?fedora} < 40 || (0%{?rhel} && 0%{?rhel} < 10)
+BuildRequires:  maven-local-openjdk11
+%else
+BuildRequires:  maven-local
+%endif
 BuildRequires:	cmake
-BuildRequires:	ant
 BuildRequires:	gcc-c++
-BuildRequires:	java-devel
 BuildRequires:	libcurl-devel
 BuildRequires:	bzip2-devel
 BuildRequires:	cryptopp-devel
@@ -42,7 +45,10 @@ BuildRequires:	zlib-devel
 BuildRequires:	fontconfig-devel
 BuildRequires:	pcsc-lite-devel
 
-Requires:		java
+BuildRequires:	mvn(com.google.code.gson:gson)
+BuildRequires:	mvn(net.java.dev.jna:jna)
+BuildRequires:	mvn(org.ghost4j:ghost4j)
+BuildRequires:	mvn(ch.swingfx:twinkle)
 
 # Bundle PoDoFo to avoid fixing code where the available version is 10+
 # License: LGPL 2.0
@@ -52,6 +58,8 @@ Provides:		bundled(podofo) = 0.9.6
 Middleware for CIE (Carta di Identità Elettronica).
 A Java app to sign and verify documents and to manage the card.
 A PKCS11 library to allow programs to use the card.
+
+%{?javadoc_package}
 
 %prep
 %autosetup -n %{name}-linux-%{version} -p1
@@ -81,7 +89,7 @@ cp -rf cie-pkcs11/* libcie/src/
 rm -f libcie/src/Sign/definitions.h
 
 # Unpack podofo
-tar xvf %{SOURCE5}
+tar xvf %{SOURCE4}
 mv podofo-0.9.6 podofo
 
 # Add our CMakeLists.txt for libcie-pkcs11
@@ -91,6 +99,15 @@ install %{SOURCE1} CMakeLists.txt
 %if 0%{?fedora} > 38 || 0%{?rhel} > 9
 sed -i '0,/cryptopp/s/cryptopp/libcryptopp/' CMakeLists.txt
 %endif
+
+# Install CIEID pom.xml file
+install %{SOURCE5} pom.xml
+
+# Remove jar artifacts
+rm -rf CIEID/lib
+
+# Set alternative names
+%mvn_file :cieid cieid/cieid
 
 %build
 # Build and fake-install PoDoFo
@@ -117,18 +134,21 @@ DESTDIR=./podofo_lib %__cmake --install podofo_build
 %cmake_build
 
 # Build CIEID
-pushd CIEID
-	ant deploy
-popd
+%mvn_build
 
 %install
 %cmake_install
 
-mkdir -p %{buildroot}%{_javadir}/CIEID/lib
-pushd CIEID
-	install dist/CIEID.jar %{buildroot}%{_javadir}/CIEID/
-	cp lib/*.jar %{buildroot}%{_javadir}/CIEID/lib
-popd
+%mvn_install
+
+# Generate wrapper script
+%jpackage_script it.ipzs.cieid.MainApplication "" OPTS CPATH cieid true
+
+# Workaround to avoid spaces from messing up
+sed -i 's/OPTS/\"-Xms1G -Xmx1G\"/' %{buildroot}%{_bindir}/cieid
+
+# Workaround to provide classpaths with groupId:artifactId
+sed -i 's/CPATH/it.ipzs:cieid com.google.code.gson:gson net.java.dev.jna:jna org.ghost4j:ghost4j ch.swingfx:twinkle apache-commons-io openpdf slf4j/' %{buildroot}%{_bindir}/cieid
 
 mkdir -p %{buildroot}%{_datadir}/pixmaps
 install -m 0644 %{SOURCE2} %{buildroot}%{_datadir}/pixmaps/cieid.png
@@ -136,31 +156,10 @@ install -m 0644 %{SOURCE2} %{buildroot}%{_datadir}/pixmaps/cieid.png
 mkdir -p %{buildroot}%{_datadir}/applications
 install -m 0644 %{SOURCE3} %{buildroot}%{_datadir}/applications/cieid.desktop
 
-mkdir -p %{buildroot}%{_bindir}
-install -m 0755 %{SOURCE4} %{buildroot}%{_bindir}/cieid
-
-# Remove duplicate java library
-rm -f %{buildroot}%{_javadir}/CIEID/lib/jna-4.1.0.jar
-
-# Generate classpaths
-CLASSPATHS=""
-for jarfile in $(ls %{buildroot}%{_javadir}/CIEID/lib);
-do
-	CLASSPATHS="$CLASSPATHS:/usr/share/java/CIEID/lib/$jarfile"	
-done
-
-sed -i "s!PATH!$CLASSPATHS!" %{buildroot}%{_bindir}/cieid
-
-%check
-cd CIEID
-ant test
-
-%files
+%files -f .mfiles
 %license LICENSE
 %{_bindir}/cieid
 %{_libdir}/libcie-pkcs11.so
-%{_javadir}/CIEID/lib/*.jar
-%{_javadir}/CIEID/CIEID.jar
 %{_datadir}/pixmaps/cieid.png
 %{_datadir}/applications/cieid.desktop
 
