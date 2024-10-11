@@ -145,7 +145,7 @@ DESTDIR=./podofo_lib %__cmake --install podofo_build
 %jpackage_script it.ipzs.cieid.MainApplication "" OPTS CPATH cieid true
 
 # Workaround to avoid spaces from messing up
-sed -i 's/OPTS/\"-Xms1G -Xmx1G\"/' %{buildroot}%{_bindir}/cieid
+sed -i 's/OPTS/\"-Xms1G -Xmx1G -Dawt.useSystemAAFontSettings=on\"/' %{buildroot}%{_bindir}/cieid
 
 # Workaround to provide classpaths with groupId:artifactId
 sed -i 's/CPATH/it.ipzs:cieid com.google.code.gson:gson net.java.dev.jna:jna org.ghost4j:ghost4j ch.swingfx:twinkle apache-commons-io openpdf slf4j/' %{buildroot}%{_bindir}/cieid
