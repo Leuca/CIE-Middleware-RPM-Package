@@ -23,7 +23,7 @@ jobs:
         run: |
           mkdir SRPMS
           podman build -v $PWD:/project --tag rpmbuilder -f Containerfile
-          CID="$(podman run --rmi -v $PWD/SRPMS:/root/rpmbuild/SRPMS:rw,z,shared,bind,U -d --userns keep-id rpmbuilder)"
+          CID="$(podman run --rmi -v $PWD/SRPMS:/root/rpmbuild/SRPMS:rw,z,shared,bind,U -d rpmbuilder)"
           podman exec $CID rpmbuild -bs "SPECS/cie-middleware.spec"
           podman stop $CID
       - name: Version
