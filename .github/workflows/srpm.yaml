@@ -5,11 +5,12 @@ on:
       - main
     pull_reques:
 
+permissions: write-all
+
 jobs:
   srpm:
     name: Build SRPM
     runs-on: ubuntu-latest
-
 
     steps:
       - name: Setup Podman
@@ -29,15 +30,15 @@ jobs:
           podman exec $CID rpmbuild -bs "SPECS/cie-middleware.spec"
           podman stop $CID
       - name: Version
-        run: echo "$(ls SRPMS/*.rpm | cut -d'-' -f3 )"
+        run: echo "version=$(ls SRPMS/*.rpm | cut -d'-' -f3 )" >> "$GITHUB_OUTPUT"
         id: version
       - name: Release
-        run: echo "$(ls SRPMS/*.rpm | cut -d'-' -f4 | cut -d'.' -f1)"
+        run: echo "release=$(ls SRPMS/*.rpm | cut -d'-' -f4 | cut -d'.' -f1)" >> "$GITHUB_OUTPUT"
         id: release
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
           artifacts: "SRPMS/*.rpm"
-          name: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release}}
-          tag: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release}}
+          name: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release }}
+          tag: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release }}
           commit: main
