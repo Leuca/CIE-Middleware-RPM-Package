@@ -19,6 +19,8 @@ jobs:
           podman pull fedora
       - name: Get source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Create container and build srpm
         run: |
           mkdir SRPMS
@@ -40,12 +42,12 @@ jobs:
           release_name: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release}}
           tag_name: ${{ github.ref }}
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload Release asset
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./SRPMS/*.rpm
