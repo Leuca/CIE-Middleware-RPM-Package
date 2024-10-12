@@ -22,7 +22,7 @@ jobs:
       - name: Create container and build srpm
         run: |
           mkdir SRPMS
-          podman build --tag rpmbuilder -f Containerfile
+          podman build -v $PWD:/home/builder/project --tag rpmbuilder -f Containerfile
           CID="$(podman run --rmi -v $PWD/SRPMS:/home/builder/rpmbuild/SRPMS:rw,z,shared,bind,U -d --userns keep-id rpmbuilder)"
           podman exec $CID rpmbuild -bs "SPECS/cie-middleware.spec"
           podman stop $CID
