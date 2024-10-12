@@ -39,3 +39,5 @@ jobs:
         with:
           artifacts: "SRPMS/*.rpm"
           name: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release}}
+          tag: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release}}
+          commit: main
