@@ -1,0 +1,51 @@
+name: SRPM CI
+on:
+  push:
+    branches:
+      - main
+    pull_reques:
+
+jobs:
+  srpm:
+    name: Build SRPM
+    runs-on: ubuntu-latest
+
+
+    steps:
+      - name: Setup Podman
+        run: |
+          sudo apt update
+          sudo apt-get -y install podman
+          podman pull fedora
+      - name: Get source
+        uses: actions/checkout@v4
+      - name: Create container and build srpm
+        run: |
+          mkdir SRPMS
+          podman build --tag rpmbuilder -f Containerfile
+          CID="$(podman run --rmi -v $PWD/SRPMS:/home/builder/rpmbuild/SRPMS:rw,z,shared,bind,U -d --userns keep-id rpmbuilder)"
+          podman exec $CID rpmbuild -bs "SPECS/cie-middleware.spec"
+          podman stop $CID
+      - name: Version
+        run: echo "$(ls SRPMS/*.rpm | cut -d'-' -f3 )"
+        id: version
+      - name: Release
+        run: echo "$(ls SRPMS/*.rpm | cut -d'-' -f4 | cut -d'.' -f1)"
+        id: release
+      - name: Create Release
+        uses: actions/create-release@v1
+        with:
+          draft: false
+          prerelease: false
+          release_name: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release}}
+          tag_name: ${{ github.ref }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload Release asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./SRPMS/*.rpm
