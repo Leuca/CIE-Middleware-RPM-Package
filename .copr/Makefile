@@ -7,3 +7,4 @@ sources: pkgs
 
 srpm: sources
 	fedpkg srpm
+	cp *.src.rpm $(outdir)
