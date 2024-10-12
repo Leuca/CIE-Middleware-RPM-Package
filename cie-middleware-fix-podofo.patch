@@ -1,6 +1,6 @@
-From ee0ec235e461f68cdf40509e1f1e5d706fc312d5 Mon Sep 17 00:00:00 2001
+From 3bcf901154a5ef07c3cc0dccaff303d548fbded0 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
-Date: Tue, 8 Oct 2024 12:22:58 +0200
+Date: Sat, 12 Oct 2024 02:28:09 +0200
 Subject: [PATCH] cie_sign_sdk: podofo: adapt code for unpatched version of
  podofo
 
@@ -10,32 +10,11 @@ able to compile and link against podofo
 
 Signed-off-by: Luca Magrone <luca@magrone.cc>
 ---
- cie_sign_sdk/include/PdfSignatureGenerator.h |  6 +-
- cie_sign_sdk/src/PdfSignatureGenerator.cpp   | 69 ++++++++++----------
- cie_sign_sdk/src/disigonsdk.cpp              |  4 +-
- 3 files changed, 39 insertions(+), 40 deletions(-)
+ cie_sign_sdk/src/PdfSignatureGenerator.cpp | 59 +++++++++++-----------
+ 1 file changed, 29 insertions(+), 30 deletions(-)
 
-diff --git a/cie_sign_sdk/include/PdfSignatureGenerator.h b/cie_sign_sdk/include/PdfSignatureGenerator.h
-index 5a19d6f..f00ad55 100644
---- a/cie_sign_sdk/include/PdfSignatureGenerator.h
-+++ b/cie_sign_sdk/include/PdfSignatureGenerator.h
-@@ -28,11 +28,11 @@ public:
- 	
- 	int Load(const char* pdf, int len);
- 	
--	void InitSignature(int pageIndex, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter);
-+	void InitSignature(int pageIndex, const char* szReason, const char* szName, const char* szLocation, const char* szFieldName, const char* szSubFilter);
- 	
--	void InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter);
-+	void InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szName, const char* szLocation, const char* szFieldName, const char* szSubFilter);
- 	
--	void InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter, const char* szImagePath, const char* szDescription, const char* szGraphometricData, const char* szVersion);
-+	void InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szName, const char* szLocation, const char* szFieldName, const char* szSubFilter, const char* szImagePath, const char* szDescription,/* const char* szGraphometricData,*/ const char* szVersion);
- 	
- 	void GetBufferForSignature(UUCByteArray& toSign);
- 	
 diff --git a/cie_sign_sdk/src/PdfSignatureGenerator.cpp b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
-index be4dc0c..799fd30 100644
+index be4dc0c..e983a31 100644
 --- a/cie_sign_sdk/src/PdfSignatureGenerator.cpp
 +++ b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
 @@ -27,10 +27,7 @@ USE_LOG;
@@ -50,29 +29,27 @@ index be4dc0c..799fd30 100644
  
  PdfSignatureGenerator::~PdfSignatureGenerator()
  {
-@@ -68,15 +65,16 @@ int PdfSignatureGenerator::Load(const char* pdf, int len)
+@@ -68,15 +65,13 @@ int PdfSignatureGenerator::Load(const char* pdf, int len)
          printf("STOP");
  
  		m_pPdfDocument = new PdfMemDocument();
 -		m_pPdfDocument->Load(pdf, len);
 -		printf("OK m_pPdfDocument");
-+		m_pPdfDocument->LoadFromBuffer(pdf, len, false);
++		m_pPdfDocument->LoadFromBuffer(pdf, len, true);
 +
  		int nSigns = PDFVerifier::GetNumberOfSignatures(m_pPdfDocument);
  		printf("OK nSigns: %d", nSigns);
  
- 		if(nSigns > 0)
+-		if(nSigns > 0)
 -		{
 -			m_pPdfDocument->SetIncrementalUpdates(true);
 -		}
-+			m_pPdfDocument->LoadFromBuffer(pdf, len, true);
-+
 +		printf("OK m_pPdfDocument");
 +
  		m_actualLen = len;
  		
  		return nSigns;
-@@ -97,25 +95,25 @@ void PdfSignatureGenerator::AddFont(const char* szFontName, const char* szFontPa
+@@ -97,8 +92,8 @@ void PdfSignatureGenerator::AddFont(const char* szFontName, const char* szFontPa
  	//printf(szFontPath);
  	
  	
@@ -82,31 +59,8 @@ index be4dc0c..799fd30 100644
 +	PdfFont* font1 = m_pPdfDocument->CreateFont(szFontName, true, false, true, PdfEncodingFactory::GlobalWinAnsiEncodingInstance(), PdfFontCache::eFontCreationFlags_AutoSelectBase14, true, szFontPath);
  }
  
--void PdfSignatureGenerator::InitSignature(int pageIndex, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter)
-+void PdfSignatureGenerator::InitSignature(int pageIndex, const char* szReason, const char* szName, const char* szLocation, const char* szFieldName, const char* szSubFilter)
- {
- 	LOG_DBG((0, "quella con tutti 0\n", ""));
--	InitSignature(pageIndex, 0, 0, 0, 0, szReason, szReasonLabel, szName, szNameLabel, szLocation, szLocationLabel, szFieldName, szSubFilter);
-+	InitSignature(pageIndex, 0, 0, 0, 0, szReason, szName, szLocation, szFieldName, szSubFilter);
- }
- 
--void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter)
-+void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szName, const char* szLocation, const char* szFieldName, const char* szSubFilter)
- {
- 	LOG_DBG((0,"quella senza tutti 0\n", ""));
--	InitSignature(pageIndex, left, bottom, width,  height, szReason, szReasonLabel, szName, szNameLabel, szLocation, szLocationLabel, szFieldName, szSubFilter, NULL, NULL, NULL, NULL);
-+	InitSignature(pageIndex, left, bottom, width, height, szReason, szName, szLocation, szFieldName, szSubFilter, NULL, NULL,/* NULL,*/ NULL);
- }
- 
--void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter, const char* szImagePath, const char* szDescription, const char* szGraphometricData, const char* szVersion)
-+void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szName, const char* szLocation, const char* szFieldName, const char* szSubFilter, const char* szImagePath, const char* szDescription,/* const char* szGraphometricData,*/ const char* szVersion)
- {
--	LOG_DBG((0, "--> InitSignature", "%d, %f, %f, %f, %f, %s, %s, %s, %s, %s, %s, %s, %s", pageIndex, left, bottom, width, height, szReason, szName, szLocation, szFieldName, szSubFilter, szImagePath, szGraphometricData, szVersion));
-+	LOG_DBG((0, "--> InitSignature", "%d, %f, %f, %f, %f, %s, %s, %s, %s, %s, %s, %s, %s", pageIndex, left, bottom, width, height, szReason, szName, szLocation, szFieldName, szSubFilter, szImagePath,/* szGraphometricData,*/ szVersion));
-     //LOG_DBG((0, "--> InitSignature", ""));
-     
-              
-@@ -137,7 +135,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+ void PdfSignatureGenerator::InitSignature(int pageIndex, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter)
+@@ -137,7 +132,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
  	
  	LOG_DBG((0, "InitSignature", "PdfSignatureField"));
  
@@ -115,7 +69,7 @@ index be4dc0c..799fd30 100644
  
  	LOG_DBG((0, "InitSignature", "PdfSignatureField OK"));
  
-@@ -147,8 +145,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+@@ -147,8 +142,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
  	if(szReason && szReason[0])
  	{
  		PdfString reason(szReason);	
@@ -125,7 +79,7 @@ index be4dc0c..799fd30 100644
  	}
  	
  	LOG_DBG((0, "InitSignature", "szReason OK"));
-@@ -156,8 +153,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+@@ -156,8 +150,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
  	if(szLocation && szLocation[0])
  	{
  		PdfString location(szLocation);
@@ -135,7 +89,7 @@ index be4dc0c..799fd30 100644
  	}
  
  	LOG_DBG((0, "InitSignature", "szLocation OK"));
-@@ -169,24 +165,22 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+@@ -169,24 +162,29 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
  
  	if(szName && szName[0])
  	{
@@ -159,15 +113,22 @@ index be4dc0c..799fd30 100644
  		{
 -            //m_pSignatureField->SetFontSize(5);
 -			m_pSignatureField->SetAppearance(szImagePath, szDescription);
-+			//PdfXObject* pXObj;
-+			//m_pPdfDocument.FillXObjectFromExistingPage(pXObj, pageIndex, false);
-+			PdfImage* pXObj;
-+			pXObj->LoadFromFile(szImagePath);
-+			m_pSignatureField->SetAppearanceStream(pXObj);
++			PdfImage image(m_pPdfDocument);
++			PdfXObject xObj(cropBox, m_pPdfDocument);
++			PdfPainter painter;
++
++			image.LoadFromFile(szImagePath);
++
++			painter.SetPage(&xObj);
++			painter.DrawImage(left0, bottom0, &image);
++			painter.FinishPage();
++
++			m_pSignatureField->SetAppearanceStream(&xObj);
++
  			LOG_DBG((0, "InitSignature", "SetAppearance OK"));
  		}
  		catch( PdfError & error ) 
-@@ -210,13 +204,14 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+@@ -210,13 +208,14 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
  			LOG_ERR((0, "InitSignature", "SetAppearance unknown error"));			
  		}
  	}
@@ -184,7 +145,7 @@ index be4dc0c..799fd30 100644
  
  	//	// crea il nuovo doc con il campo di firma
  	//	int fulllen = m_actualLen * 3 + SINGNATURE_SIZE * 2;
-@@ -227,7 +222,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+@@ -227,7 +226,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
  	
      LOG_DBG((0, "InitSignature", "m_actualLen %d", m_actualLen));
  	// crea il nuovo doc con il campo di firma
@@ -193,37 +154,15 @@ index be4dc0c..799fd30 100644
  
  	
  
-@@ -238,7 +233,11 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+@@ -238,7 +237,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
              LOG_DBG((0, "InitSignature", "fulllen %d", fulllen));
  			m_pMainDocbuffer = new char[fulllen];
  			PdfOutputDevice pdfOutDevice(m_pMainDocbuffer, fulllen);
 -			m_pPdfDocument->Write(&pdfOutDevice);
-+			int nSigns = PDFVerifier::GetNumberOfSignatures(m_pPdfDocument);
-+			if (nSigns > 0)
-+				m_pPdfDocument->WriteUpdate(&pdfOutDevice);
-+			else
-+				m_pPdfDocument->Write(&pdfOutDevice);
++			m_pPdfDocument->WriteUpdate(&pdfOutDevice);
  			mainDoclen = pdfOutDevice.GetLength();
  		}
  		catch (::PoDoFo::PdfError err) {
-diff --git a/cie_sign_sdk/src/disigonsdk.cpp b/cie_sign_sdk/src/disigonsdk.cpp
-index b807d92..25b7e3f 100644
---- a/cie_sign_sdk/src/disigonsdk.cpp
-+++ b/cie_sign_sdk/src/disigonsdk.cpp
-@@ -1950,11 +1950,11 @@ long sign_pdf(DISIGON_SIGN_CONTEXT* pContext, UUCByteArray& data)
-             }
-             
-         }
--        sigGen.InitSignature(pContext->nPdfPage, pContext->fPdfLeft, pContext->fPdfBottom, pContext->fPdfWidth, pContext->fPdfHeight, pContext->szPdfReason, pContext->szPdfReasonLabel, pContext->szPdfName,pContext->szPdfNameLabel, pContext->szPdfLocation, pContext->szPdfLocationLabel, sigName.c_str(), pContext->szPdfSubfilter, pContext->szPdfImagePath, pContext->szPdfDescription, NULL, NULL);
-+        sigGen.InitSignature(pContext->nPdfPage, pContext->fPdfLeft, pContext->fPdfBottom, pContext->fPdfWidth, pContext->fPdfHeight, pContext->szPdfReason, pContext->szPdfName, pContext->szPdfLocation, sigName.c_str(), pContext->szPdfSubfilter, pContext->szPdfImagePath, pContext->szPdfDescription,/* NULL,*/ NULL);
-     }
-     else
-     {
--        sigGen.InitSignature(0, pContext->szPdfReason, pContext->szPdfReasonLabel, pContext->szPdfName,pContext->szPdfNameLabel, pContext->szPdfLocation, pContext->szPdfLocationLabel, sigName.c_str(), pContext->szPdfSubfilter);
-+        sigGen.InitSignature(0, pContext->szPdfReason, pContext->szPdfName, pContext->szPdfLocation, sigName.c_str(), pContext->szPdfSubfilter);
-     }
-     
-     LOG_DBG((0, "sign_pdf", "InitSignature OK"));
 -- 
 2.43.5
 
