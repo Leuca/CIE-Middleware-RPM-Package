@@ -10,9 +10,6 @@ RUN useradd -m builder
 USER builder
 RUN rpmdev-setuptree
 
-# Create project directory
-RUN mkdir /home/builder/project
-
 # Download sources
 WORKDIR /home/builder/rpmbuild/SOURCES
 RUN curl -O $(spectool -S /home/builder/project/cie-middleware.spec 2>/dev/null | grep Source0 | cut -d" " -f 2)
