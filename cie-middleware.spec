@@ -52,6 +52,8 @@ BuildRequires:	mvn(net.java.dev.jna:jna)
 BuildRequires:	mvn(org.ghost4j:ghost4j)
 BuildRequires:	mvn(ch.swingfx:twinkle)
 
+Requires:		xmvn-tools
+
 # Bundle PoDoFo to avoid fixing code where the available version is 10+
 # License: LGPL 2.0
 Provides:		bundled(podofo) = 0.9.6
