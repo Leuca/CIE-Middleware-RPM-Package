@@ -1,0 +1,75 @@
+From 3d6df4c8194fae352369e7ce5a715c92f2c085de Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sun, 13 Oct 2024 17:10:41 +0200
+Subject: [PATCH] CIEID: Allow the user to exit with ctrl+q and ctrl+w
+
+Attach a AWTEventListener to the Toolkit that checks if the user presses
+the combinatrions CTRL+Q or CTRL+W. On press close the current window.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ CIEID/src/it/ipzs/cieid/MainApplication.java | 29 ++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/CIEID/src/it/ipzs/cieid/MainApplication.java b/CIEID/src/it/ipzs/cieid/MainApplication.java
+index 79904d5..18ad302 100644
+--- a/CIEID/src/it/ipzs/cieid/MainApplication.java
++++ b/CIEID/src/it/ipzs/cieid/MainApplication.java
+@@ -1,11 +1,17 @@
+ package it.ipzs.cieid;
+ 
+ import java.awt.EventQueue;
++import java.awt.AWTEvent;
++import java.awt.Toolkit;
++import java.awt.Window;
++import java.awt.event.AWTEventListener;
++import java.awt.event.KeyEvent;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.nio.file.Paths;
+ 
+ import javax.swing.JFrame;
++import javax.swing.FocusManager;
+ 
+ import ch.swingfx.twinkle.NotificationBuilder;
+ import ch.swingfx.twinkle.event.NotificationEvent;
+@@ -26,6 +32,7 @@ public class MainApplication {
+ 	public static void main(final String[] args) {
+ 		EventQueue.invokeLater(new Runnable() {
+ 			public void run() {
++				installKeyboardMonitor();
+ 
+ 				if(args.length > 0 && args[0].equals("pinwrong"))
+ 				{
+@@ -51,6 +58,28 @@ public class MainApplication {
+ 		});
+ 	}
+ 
++	/**
++	 * Close the application on ctrl+q
++	 */
++	public static void installKeyboardMonitor() {
++		Toolkit.getDefaultToolkit().addAWTEventListener(new AWTEventListener() {
++			@Override
++			public void eventDispatched(AWTEvent event) {
++				KeyEvent ke = (KeyEvent) event;
++				if (ke.getID() == KeyEvent.KEY_PRESSED) {
++					if (ke.getKeyCode() == KeyEvent.VK_Q || ke.getKeyCode() == KeyEvent.VK_W) {
++						if (ke.isControlDown()) {
++							Window window = FocusManager.getCurrentManager().getActiveWindow();
++							if (window != null) {
++								window.dispose();
++							}
++						}
++					}
++				}
++			}
++		}, AWTEvent.KEY_EVENT_MASK);
++	}
++
+ 	public static void showUI(String[] args)
+ 	{
+ 		MainApplication window = new MainApplication(args);
+-- 
+2.43.5
+
