@@ -1,4 +1,4 @@
-From 58d928e9e59564b1309296319d3b0bde91e0d9e7 Mon Sep 17 00:00:00 2001
+From 1774256ef64386b966dde901881a9952117c6427 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
 Date: Sun, 6 Oct 2024 15:51:16 +0200
 Subject: [PATCH] Fix merging cie_sign_sdk and cie-pkcs11

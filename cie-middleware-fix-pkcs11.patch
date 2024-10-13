@@ -1,4 +1,4 @@
-From 7a840029e0b170aad1e0728f6e6e2c86c5cdd71e Mon Sep 17 00:00:00 2001
+From 0a2e29f176b9a5bb5bb50b02ce05bb0b76959993 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
 Date: Sun, 6 Oct 2024 23:39:12 +0200
 Subject: [PATCH] Fix segfault when creating session with token
@@ -58,7 +58,7 @@ index 5e70b3c..78fa967 100644
                  case (LM_Thread) : fprintf(lf,"%s|%04i|%02i|", pbtDate, getpid(), ModuleNum); break;
                  case (LM_Module_Thread) : fprintf(lf,"%s|", pbtDate); break;
 diff --git a/cie_sign_sdk/src/disigonsdk.cpp b/cie_sign_sdk/src/disigonsdk.cpp
-index 0459032..bf3185c 100644
+index b807d92..2370ce1 100644
 --- a/cie_sign_sdk/src/disigonsdk.cpp
 +++ b/cie_sign_sdk/src/disigonsdk.cpp
 @@ -996,13 +996,13 @@ long disigon_get_file_from_p7m(DISIGON_CTX ctx) {

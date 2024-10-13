@@ -1,4 +1,4 @@
-From e2a8d7f6e9e3552616cbfddbe99ca220d8772d17 Mon Sep 17 00:00:00 2001
+From f6be5ce7351a2a2516253198f7a57c004ff0f4c6 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
 Date: Sat, 5 Oct 2024 00:13:40 +0200
 Subject: [PATCH] cie-pkcs11: Fix ambiguous 'byte' type

@@ -1,4 +1,4 @@
-From 8d866118c50151a699d5849b587f7416b380f105 Mon Sep 17 00:00:00 2001
+From cef3ff0dafeb872eeda5319664e721888fa98c48 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
 Date: Sat, 5 Oct 2024 17:41:21 +0200
 Subject: [PATCH] cie-pkcs11: Fix cryptopp headers

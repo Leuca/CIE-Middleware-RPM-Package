@@ -1,4 +1,4 @@
-From dd9c8b3e67147ab232415eca00e7e2e033e04010 Mon Sep 17 00:00:00 2001
+From 8dcea564c9754d9153f73f9f4a80f3da5b4c3ad9 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
 Date: Mon, 7 Oct 2024 21:45:12 +0200
 Subject: [PATCH] Add missing cstring and cstdint headers

@@ -1,4 +1,4 @@
-From 562f81f3700786c890a426bdac284093933364a8 Mon Sep 17 00:00:00 2001
+From 2ccecac87eb5caa31680cfc5e08fbfdd3ca80bf5 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
 Date: Mon, 7 Oct 2024 13:29:29 +0200
 Subject: [PATCH] CIEEngine: fix openssl compilation issues
