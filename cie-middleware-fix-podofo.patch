@@ -1,6 +1,6 @@
-From 3bcf901154a5ef07c3cc0dccaff303d548fbded0 Mon Sep 17 00:00:00 2001
+From febd6fb92e36dae93bb925c07b64455a6a3e7d5f Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
-Date: Sat, 12 Oct 2024 02:28:09 +0200
+Date: Sat, 12 Oct 2024 16:10:24 +0200
 Subject: [PATCH] cie_sign_sdk: podofo: adapt code for unpatched version of
  podofo
 
@@ -10,11 +10,11 @@ able to compile and link against podofo
 
 Signed-off-by: Luca Magrone <luca@magrone.cc>
 ---
- cie_sign_sdk/src/PdfSignatureGenerator.cpp | 59 +++++++++++-----------
- 1 file changed, 29 insertions(+), 30 deletions(-)
+ cie_sign_sdk/src/PdfSignatureGenerator.cpp | 97 +++++++++++-----------
+ 1 file changed, 50 insertions(+), 47 deletions(-)
 
 diff --git a/cie_sign_sdk/src/PdfSignatureGenerator.cpp b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
-index be4dc0c..e983a31 100644
+index be4dc0c..d35cd92 100644
 --- a/cie_sign_sdk/src/PdfSignatureGenerator.cpp
 +++ b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
 @@ -27,10 +27,7 @@ USE_LOG;
@@ -35,7 +35,7 @@ index be4dc0c..e983a31 100644
  		m_pPdfDocument = new PdfMemDocument();
 -		m_pPdfDocument->Load(pdf, len);
 -		printf("OK m_pPdfDocument");
-+		m_pPdfDocument->LoadFromBuffer(pdf, len, true);
++		m_pPdfDocument->LoadFromBuffer(pdf, len, false);
 +
  		int nSigns = PDFVerifier::GetNumberOfSignatures(m_pPdfDocument);
  		printf("OK nSigns: %d", nSigns);
@@ -154,15 +154,63 @@ index be4dc0c..e983a31 100644
  
  	
  
-@@ -238,7 +237,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
-             LOG_DBG((0, "InitSignature", "fulllen %d", fulllen));
- 			m_pMainDocbuffer = new char[fulllen];
- 			PdfOutputDevice pdfOutDevice(m_pMainDocbuffer, fulllen);
--			m_pPdfDocument->Write(&pdfOutDevice);
-+			m_pPdfDocument->WriteUpdate(&pdfOutDevice);
- 			mainDoclen = pdfOutDevice.GetLength();
- 		}
- 		catch (::PoDoFo::PdfError err) {
+@@ -275,34 +274,38 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+ 
+ 	LOG_DBG((0, "InitSignature", "Write OK %d", mainDoclen));
+ 
+-	m_pSignOutputDevice->AdjustByteRange();
+-
+-	LOG_DBG((0, "InitSignature", "AdjustByteRange OK"));
+-
+ }
+ 
+ void PdfSignatureGenerator::GetBufferForSignature(UUCByteArray& toSign)
+ {
+ 	//int fulllen = m_actualLen * 2 + SINGNATURE_SIZE * 2;
+-	int len = m_pSignOutputDevice->GetLength() * 2;
+-	
+-	char* buffer = new char[len];
+-	
+-	m_pSignOutputDevice->Seek(0);
+-	
+-	int nRead = m_pSignOutputDevice->ReadForSignature(buffer, len);
+-	if(nRead == -1)
+-		throw nRead;
+-	
+-	toSign.append((BYTE*)buffer, nRead);
+-	
+-	delete buffer;
++	if(m_pSignOutputDevice->HasSignaturePosition()) {
++		int len = m_pSignOutputDevice->GetLength() * 2;
++		char* buffer = new char[len];
++
++		m_pSignOutputDevice->AdjustByteRange();
++		LOG_DBG((0, "SetSignature", "AdjustByteRange OK"));
++
++		m_pSignOutputDevice->Seek(0);
++
++		int nRead = m_pSignOutputDevice->ReadForSignature(buffer, len);
++		if(nRead == -1)
++			throw nRead;
++
++		toSign.append((BYTE*)buffer, nRead);
++
++		delete buffer;
++	}
+ }
+ 
+ void PdfSignatureGenerator::SetSignature(const char* signature, int len)
+ {
+ 	PdfData signatureData(signature, len);
+-	m_pSignOutputDevice->SetSignature(signatureData);
++	if(m_pSignOutputDevice->HasSignaturePosition()) {
++		m_pSignOutputDevice->SetSignature(signatureData);
++		LOG_DBG((0, "SetSignature", "SetSignature OK"));
++	}
++	m_pSignOutputDevice->Flush();
+ }
+ 
+ void PdfSignatureGenerator::GetSignedPdf(UUCByteArray& signedPdf)
 -- 
 2.43.5
 

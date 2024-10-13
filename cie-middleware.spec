@@ -29,6 +29,7 @@ BuildRequires:  maven-local-openjdk11
 BuildRequires:  maven-local
 %endif
 BuildRequires:	cmake
+BuildRequires:	git
 BuildRequires:	gcc-c++
 BuildRequires:	libcurl-devel
 BuildRequires:	bzip2-devel
@@ -62,7 +63,7 @@ A PKCS11 library to allow programs to use the card.
 %{?javadoc_package}
 
 %prep
-%autosetup -n %{name}-linux-%{version} -p1
+%autosetup -n %{name}-linux-%{version} -p1 -Sgit
 
 # Remove pre-compiled static libs
 rm -rf cie_sign_sdk/Dependencies
