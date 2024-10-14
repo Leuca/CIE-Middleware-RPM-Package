@@ -150,7 +150,7 @@ DESTDIR=./podofo_lib %__cmake --install podofo_build
 # Generate wrapper script for CIEID
 %global jopts -Xms1G -Xmx1G -Dawt.useSystemAAFontSettings=on
 %global cpaths cieid:google-gson:jna:ghost4j:swingfx-twinkle:apache-commons-io:openpdf:slf4j
-%jpackage_script it.ipzs.cieid.MainApplication "" "%{?quote:%jopts}" %cpaths cieid true
+%jpackage_script it.ipzs.cieid.MainApplication "" "%{quote:%jopts}" %cpaths cieid true
 
 # Install desktop configuration
 mkdir -p %{buildroot}%{_datadir}/pixmaps
