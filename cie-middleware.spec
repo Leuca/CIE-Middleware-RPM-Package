@@ -23,6 +23,7 @@ Patch6:			cie-middleware-fix-pkcs11.patch
 Patch7:			cie-middleware-fix-openssl.patch
 Patch8:			cie-middleware-fix-c++-std-headers.patch
 Patch9:			cie-middleware-keyboard-shortcuts.patch
+Patch10:			cie-middleware-fix-pkcs11-info-output.patch
 
 %if 0%{?fedora} < 40 || (0%{?rhel} && 0%{?rhel} < 10)
 BuildRequires:  maven-local-openjdk11

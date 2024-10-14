@@ -1,0 +1,177 @@
+From dc322649354738b86c7103aff16086c040d42970 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Tue, 15 Oct 2024 00:16:58 +0200
+Subject: [PATCH] cie-pkcs11: Fix token (and its objects) info
+
+The module does not correctly populate information about the smart card.
+Set the manufacturer. Actually pad data with blanks (instead of using
+zeroes). So on and so forth.
+
+At the end we will have a nike uri like this: pkcs11:model=CIE%203.0;manufacturer=Gemalto2;serial=123456789012;token=CIE
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/PKCS11/CIEP11Template.cpp  | 35 ++++++++++++++++++---------
+ cie-pkcs11/PKCS11/PKCS11Functions.cpp |  8 +++---
+ cie-pkcs11/PKCS11/Slot.cpp            | 11 ++++-----
+ 3 files changed, 32 insertions(+), 22 deletions(-)
+
+diff --git a/cie-pkcs11/PKCS11/CIEP11Template.cpp b/cie-pkcs11/PKCS11/CIEP11Template.cpp
+index a4b2c3b..5ed271e 100755
+--- a/cie-pkcs11/PKCS11/CIEP11Template.cpp
++++ b/cie-pkcs11/PKCS11/CIEP11Template.cpp
+@@ -137,7 +137,6 @@ ByteArray SkipZero(ByteArray &ba) {
+ 	return ByteArray();
+ }
+ 
+-BYTE label[] = { 'C','I','E','0' };
+ void CIEtemplateInitSession(void *pTemplateData){ 
+ 	CIEData* cie=(CIEData*)pTemplateData;
+ 
+@@ -161,29 +160,33 @@ void CIEtemplateInitSession(void *pTemplateData){
+         
+ 		CK_BBOOL vtrue = TRUE;
+ 		CK_BBOOL vfalse = FALSE;
++		BYTE labelCert[] = "CIE Certificate";
++		BYTE labelPriv[] = "CIE Private Key";
++		BYTE labelPub[] = "CIE Public Key";
++		CK_BYTE objId = 0x01; // For simplicity we only need one (numbered '1')
+ 
+         cie->pubKey = std::make_shared<CP11PublicKey>(cie);
+         cie->privKey = std::make_shared<CP11PrivateKey>(cie);
+         cie->cert = std::make_shared<CP11Certificate>(cie);
+         
+-        cie->pubKey->addAttribute(CKA_LABEL, VarToByteArray(label));
+-        cie->pubKey->addAttribute(CKA_ID, VarToByteArray(label));
++        cie->pubKey->addAttribute(CKA_LABEL, VarToByteArray(labelPub));
++        cie->pubKey->addAttribute(CKA_ID, VarToByteArray(objId));
+         cie->pubKey->addAttribute(CKA_PRIVATE, VarToByteArray(vfalse));
+         cie->pubKey->addAttribute(CKA_TOKEN, VarToByteArray(vtrue));
+         cie->pubKey->addAttribute(CKA_VERIFY, VarToByteArray(vtrue));
+         CK_KEY_TYPE keyrsa = CKK_RSA;
+         cie->pubKey->addAttribute(CKA_KEY_TYPE, VarToByteArray(keyrsa));
+         
+-        cie->privKey->addAttribute(CKA_LABEL, VarToByteArray(label));
+-        cie->privKey->addAttribute(CKA_ID, VarToByteArray(label));
++        cie->privKey->addAttribute(CKA_LABEL, VarToByteArray(labelPriv));
++        cie->privKey->addAttribute(CKA_ID, VarToByteArray(objId));
+         cie->privKey->addAttribute(CKA_PRIVATE, VarToByteArray(vtrue));
+         cie->privKey->addAttribute(CKA_TOKEN, VarToByteArray(vtrue));
+         cie->privKey->addAttribute(CKA_KEY_TYPE, VarToByteArray(keyrsa));
+         
+         cie->privKey->addAttribute(CKA_SIGN, VarToByteArray(vtrue));
+         
+-        cie->cert->addAttribute(CKA_LABEL, VarToByteArray(label));
+-        cie->cert->addAttribute(CKA_ID, VarToByteArray(label));
++        cie->cert->addAttribute(CKA_LABEL, VarToByteArray(labelCert));
++        cie->cert->addAttribute(CKA_ID, VarToByteArray(objId));
+         cie->cert->addAttribute(CKA_PRIVATE, VarToByteArray(vfalse));
+         cie->cert->addAttribute(CKA_TOKEN, VarToByteArray(vtrue));
+         
+@@ -289,10 +292,18 @@ void CIEtemplateInitSession(void *pTemplateData){
+         
+         CK_DATE start, end;
+         
+-        SYSTEMTIME sFrom, sTo;
+-        sFrom = convertStringToSystemTime(notBefore.c_str());
+-        sTo = convertStringToSystemTime(notAfter.c_str());
+-        
++        char sFrom[8], sTo[8];
++        memcpy(sFrom, notBefore.c_str(), 8);
++        memcpy(sTo, notAfter.c_str(), 8);
++
++        VarToByteArray(start.year).copy(ByteArray((BYTE*)sFrom, 4));
++        VarToByteArray(start.month).copy(ByteArray((BYTE*)&sFrom[4], 2));
++        VarToByteArray(start.day).copy(ByteArray((BYTE*)&sFrom[6], 2));
++
++        VarToByteArray(end.year).copy(ByteArray((BYTE*)sTo, 4));
++        VarToByteArray(end.month).copy(ByteArray((BYTE*)&sTo[4], 2));
++        VarToByteArray(end.day).copy(ByteArray((BYTE*)&sTo[6], 2));
++
+         cie->cert->addAttribute(CKA_START_DATE, VarToByteArray(start));
+         cie->cert->addAttribute(CKA_END_DATE, VarToByteArray(end));
+         
+@@ -354,7 +365,7 @@ ByteDynArray  CIEtemplateGetSerial(CSlot &pSlot) {
+ 	}
+ }
+ void CIEtemplateGetModel(CSlot &pSlot, std::string &szModel){ 
+-	szModel = ""; 
++	szModel = "CIE 3.0";
+ }
+ void CIEtemplateGetTokenFlags(CSlot &pSlot, CK_FLAGS &dwFlags){
+ 	dwFlags = CKF_LOGIN_REQUIRED | CKF_USER_PIN_INITIALIZED | CKF_TOKEN_INITIALIZED | CKF_REMOVABLE_DEVICE;
+diff --git a/cie-pkcs11/PKCS11/PKCS11Functions.cpp b/cie-pkcs11/PKCS11/PKCS11Functions.cpp
+index 4135729..a4a7213 100755
+--- a/cie-pkcs11/PKCS11/PKCS11Functions.cpp
++++ b/cie-pkcs11/PKCS11/PKCS11Functions.cpp
+@@ -589,13 +589,13 @@ CK_RV CK_ENTRY C_GetInfo(CK_INFO_PTR pInfo /* location that receives information
+ 			throw p11_error(CKR_CRYPTOKI_NOT_INITIALIZED);
+ 
+ 	pInfo->cryptokiVersion.major = 2; /* Cryptoki interface ver */
+-	pInfo->cryptokiVersion.minor = 10;   //12345678901234567890123456789012
+-    CryptoPP::memcpy_s((char*)pInfo->manufacturerID,32,"IPZS\0                           ", 32);
++	pInfo->cryptokiVersion.minor = 11;   //12345678901234567890123456789012
++    CryptoPP::memcpy_s((char*)pInfo->manufacturerID,32,"IPZS                            ", 32);
+ 
+ 	pInfo->flags = 0; /* must be zero */
+ 
+ 	/* libraryDescription and libraryVersion are new for v2.0 */
+-	CryptoPP::memcpy_s((char*)pInfo->libraryDescription,32,"CIE PKCS11\0                     ", 32);
++	CryptoPP::memcpy_s((char*)pInfo->libraryDescription,32,"CIE PKCS11                      ", 32);
+ 
+ 	pInfo->libraryVersion.major = 1; /* version of library */
+ 	pInfo->libraryVersion.minor = 0; /* version of library */
+@@ -617,7 +617,7 @@ CK_RV CK_ENTRY C_GetFunctionList(CK_FUNCTION_LIST_PTR_PTR ppFunctionList)
+     if (ppFunctionList == NULL)
+         throw p11_error(CKR_ARGUMENTS_BAD);
+ 
+-    static CK_FUNCTION_LIST functionList = {{ 2, 20},
++    static CK_FUNCTION_LIST functionList = {{ 2, 11},
+         C_Initialize,
+         C_Finalize,
+         C_GetInfo,
+diff --git a/cie-pkcs11/PKCS11/Slot.cpp b/cie-pkcs11/PKCS11/Slot.cpp
+index 2110cdd..107ba8a 100755
+--- a/cie-pkcs11/PKCS11/Slot.cpp
++++ b/cie-pkcs11/PKCS11/Slot.cpp
+@@ -397,7 +397,7 @@ namespace p11 {
+ 		if (pTemplate == nullptr)
+ 			throw p11_error(CKR_TOKEN_NOT_RECOGNIZED);
+ 
+-		memset(pInfo->label, 0, sizeof(pInfo->label));
++		memset(pInfo->label, ' ', sizeof(pInfo->label));
+ 		CryptoPP::memcpy_s((char*)pInfo->label, 32, pTemplate->szName.c_str(), min1(pTemplate->szName.length(), sizeof(pInfo->label)));
+ 		memset(pInfo->manufacturerID, ' ', sizeof(pInfo->manufacturerID));
+ 
+@@ -429,6 +429,7 @@ namespace p11 {
+             manifacturer = "STM3";
+ 		else
+ 			throw p11_error(CKR_TOKEN_NOT_RECOGNIZED);
++#endif
+ 
+ 		CryptoPP::memcpy_s((char*)pInfo->manufacturerID, 32, manifacturer.c_str(), manifacturer.size());
+ 
+@@ -436,17 +437,15 @@ namespace p11 {
+ 			pSerialTemplate = pTemplate;
+ 			baSerial = pTemplate->FunctionList.templateGetSerial(*this);
+ 		}
+-#endif
++
+ 		std::string model;
+ 		pTemplate->FunctionList.templateGetModel(*this, model);
+ 
+-		memset(pInfo->serialNumber, 0, sizeof(pInfo->serialNumber));
++		memset(pInfo->serialNumber, ' ', sizeof(pInfo->serialNumber));
+ 		size_t UIDsize = min1(sizeof(pInfo->serialNumber), baSerial.size());
+ 		CryptoPP::memcpy_s(pInfo->serialNumber, 16, baSerial.data(), UIDsize);
+ 
+-		CryptoPP::memcpy_s((char*)pInfo->label + pTemplate->szName.length() + 1, sizeof(pInfo->label) - pTemplate->szName.length() - 1, baSerial.data(), baSerial.size());
+-
+-		memset(pInfo->model, 0, sizeof(pInfo->model));
++		memset(pInfo->model, ' ', sizeof(pInfo->model));
+ 		CryptoPP::memcpy_s(pInfo->model, 16, model.c_str(), min1(model.length(), sizeof(pInfo->model)));
+ 
+ 		CK_FLAGS dwFlags;
+-- 
+2.43.5
+
