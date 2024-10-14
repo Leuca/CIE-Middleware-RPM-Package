@@ -2,7 +2,7 @@ Name:			cie-middleware
 Version:		1.4.3.9
 Release:		%autorelease
 Summary:		Middleware for CIE (Italian Electronic ID Card)
-License:		BSD 3-Clause
+License:		(BSD-3-Clause AND LGPL-2.0)
 URL:			https://github.com/italia/cie-middleware-linux
 
 ExclusiveArch:	%{java_arches}
@@ -54,7 +54,7 @@ BuildRequires:	mvn(ch.swingfx:twinkle)
 
 Requires:		xmvn-tools
 
-# Bundle PoDoFo to avoid fixing code where the available version is 10+
+# Bundle PoDoFo to avoid maintaining fixes for multiple versions
 # License: LGPL 2.0
 Provides:		bundled(podofo) = 0.9.6
 
@@ -111,7 +111,7 @@ install %{SOURCE5} pom.xml
 rm -rf CIEID/lib
 
 # Set alternative names
-%mvn_file :cieid cieid/cieid
+%mvn_file :cieid cieid/cieid cieid
 
 %build
 # Build and fake-install PoDoFo
@@ -141,19 +141,18 @@ DESTDIR=./podofo_lib %__cmake --install podofo_build
 %mvn_build
 
 %install
+# Install library
 %cmake_install
 
+# Install CIEID
 %mvn_install
 
-# Generate wrapper script
-%jpackage_script it.ipzs.cieid.MainApplication "" OPTS CPATH cieid true
+# Generate wrapper script for CIEID
+%global jopts -Xms1G -Xmx1G -Dawt.useSystemAAFontSettings=on
+%global cpaths cieid:google-gson:jna:ghost4j:swingfx-twinkle:apache-commons-io:openpdf:slf4j
+%jpackage_script it.ipzs.cieid.MainApplication "" "%{?quote:%jopts}" %cpaths cieid true
 
-# Workaround to avoid spaces from messing up
-sed -i 's/OPTS/\"-Xms1G -Xmx1G -Dawt.useSystemAAFontSettings=on\"/' %{buildroot}%{_bindir}/cieid
-
-# Workaround to provide classpaths with groupId:artifactId
-sed -i 's/CPATH/it.ipzs:cieid com.google.code.gson:gson net.java.dev.jna:jna org.ghost4j:ghost4j ch.swingfx:twinkle apache-commons-io openpdf slf4j/' %{buildroot}%{_bindir}/cieid
-
+# Install desktop configuration
 mkdir -p %{buildroot}%{_datadir}/pixmaps
 install -m 0644 %{SOURCE2} %{buildroot}%{_datadir}/pixmaps/cieid.png
 
