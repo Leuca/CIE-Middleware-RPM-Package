@@ -35,10 +35,17 @@ jobs:
       - name: Release
         run: echo "release=$(ls SRPMS/*.rpm | cut -d'-' -f4 | cut -d'.' -f1)" >> "$GITHUB_OUTPUT"
         id: release
+      - name: Sign
+        uses: FKLC/sign-files-action@v1.0.0
+        with:
+          privateKey: ${{ secrets.PRIVATE_KEY }}
+          outputFolder: 'SRPMS'
+          files: |
+            SRPMS/*.rpm
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "SRPMS/*.rpm"
+          artifacts: "SRPMS/*.rpm,SRPMS/*.rpm.sig"
           name: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release }}
           tag: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release }}
           commit: main
