@@ -39,13 +39,14 @@ jobs:
         uses: FKLC/sign-files-action@v1.0.0
         with:
           privateKey: ${{ secrets.PRIVATE_KEY }}
+          extension: '.sha256.sig'
           outputFolder: 'SRPMS'
           files: |
             SRPMS/*.rpm
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "SRPMS/*.rpm,SRPMS/*.rpm.sig"
+          artifacts: "public_key.pem,SRPMS/*.rpm,SRPMS/*.rpm.sha256.sig"
           name: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release }}
           tag: ${{ steps.version.outputs.version }}-${{ steps.release.outputs.release }}
           commit: main
