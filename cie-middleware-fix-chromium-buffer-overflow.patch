@@ -1,0 +1,28 @@
+From 754dbb4a06c626817bddde261cf8ddfd1468293f Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Tue, 15 Oct 2024 19:15:00 +0200
+Subject: [PATCH] cie-pkcs11: LOGGER: debug: increase buffer size to 8192
+
+It fixes a buffer overflow on chromium-based browsers
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/LOGGER/Logger.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cie-pkcs11/LOGGER/Logger.cpp b/cie-pkcs11/LOGGER/Logger.cpp
+index 3df99b5..6591215 100644
+--- a/cie-pkcs11/LOGGER/Logger.cpp
++++ b/cie-pkcs11/LOGGER/Logger.cpp
+@@ -265,7 +265,7 @@ void Logger::log_log(ostream& out, LogLevel level, const char* text) throw() {
+ // Interface for Debug Log
+ void Logger::debug(const char* fmt, ...) throw()
+ {
+-	char buffer[4096];
++	char buffer[8192];
+ 	va_list args;
+ 	va_start(args, fmt);
+ 
+-- 
+2.43.5
+

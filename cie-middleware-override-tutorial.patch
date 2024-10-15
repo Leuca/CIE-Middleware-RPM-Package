@@ -1,0 +1,278 @@
+From 0f8746e40656ddbde6a63031ee2e961d5323f019 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Tue, 15 Oct 2024 22:16:03 +0200
+Subject: [PATCH] CIEID: Override turorial to explain the OpenSC issue
+
+Replace the remote webpage loaded from the tutorial tab with a bundled
+one that reflects the new changes introduced with the set of patches
+included in the RPM package.
+
+Specifically, inform the user that no further configuration has to be
+done unless there is OpenSC installed on the system. Walk the user
+through what to do if that's the case.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ CIEID/src/it/ipzs/cieid/MainFrame.java        |   2 +-
+ .../src/it/ipzs/cieid/res/tutorial_linux.html | 236 ++++++++++++++++++
+ 2 files changed, 237 insertions(+), 1 deletion(-)
+ create mode 100644 CIEID/src/it/ipzs/cieid/res/tutorial_linux.html
+
+diff --git a/CIEID/src/it/ipzs/cieid/MainFrame.java b/CIEID/src/it/ipzs/cieid/MainFrame.java
+index ac56eca..1c42a7e 100644
+--- a/CIEID/src/it/ipzs/cieid/MainFrame.java
++++ b/CIEID/src/it/ipzs/cieid/MainFrame.java
+@@ -1244,7 +1244,7 @@ public class MainFrame extends JFrame {
+         MiniWebView webView = new MiniWebView();
+         webView.setBounds(12, 99, 571, 362);
+         panel_8.add(webView);
+-        webView.showPage("https://idserver.servizicie.interno.gov.it/idp/tutorial/computer/lettoreusb/linux/tutorial_linux_firefox.jsp");
++        webView.showPage(MainFrame.class.getResource("/it/ipzs/cieid/res/tutorial_linux.html"));
+         panel_9 = new JPanel();
+         panel_9.setLayout(null);
+         panel_9.setBackground(Color.WHITE);
+diff --git a/CIEID/src/it/ipzs/cieid/res/tutorial_linux.html b/CIEID/src/it/ipzs/cieid/res/tutorial_linux.html
+new file mode 100644
+index 0000000..0509ce2
+--- /dev/null
++++ b/CIEID/src/it/ipzs/cieid/res/tutorial_linux.html
+@@ -0,0 +1,236 @@
++<!doctype html>
++<html lang="it">
++<head>
++<meta charset="UTF-8">
++<title>Aiuto</title>
++<link rel="preconnect" href="https://fonts.googleapis.com">
++<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
++<link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700&display=swap" rel="stylesheet">
++<style type="text/css" media="screen">
++/* latin-ext */
++@font-face {
++	font-family: 'Titillium Web', sans-serif;
++	font-style: normal;
++	font-weight: 300;
++}
++
++
++/* latin */
++@font-face {
++	font-family: 'Titillium Web', sans-serif;
++	font-style: normal;
++	font-weight: 300;
++}
++
++
++/* latin-ext */
++@font-face {
++	font-family: 'Titillium Web', sans-serif;
++	font-style: normal;
++	font-weight: 400;
++}
++/* latin */
++@font-face {
++	font-family: 'Titillium Web', sans-serif;
++	font-style: normal;
++	font-weight: 400;
++}
++
++/* latin-ext */
++@font-face {
++	font-family: 'Titillium Web', sans-serif;
++	font-style: normal;
++	font-weight: 600;
++}
++/* latin */
++@font-face {
++	font-family: 'Titillium Web', sans-serif;
++	font-style: normal;
++	font-weight: 600;
++}
++/* latin-ext */
++@font-face {
++	font-family: 'Titillium Web', sans-serif;
++	font-style: normal;
++	font-weight: 700;
++}
++/* latin */
++@font-face {
++	font-family: 'Titillium Web', sans-serif;
++	font-style: normal;
++	font-weight: 700;
++}
++
++
++body {
++	height: 94.5%;
++	width: 88.2%;
++	font-family: Titillium Web;
++	color: #747474;
++	font-size: 21px;
++	font-weight: 400;
++	text-align:justify
++}
++
++.title {
++font-family: Titillium Web;
++	color: #747474;
++	font-size: 30px;
++	font-weight: 700;
++	text-align: center
++}
++
++.subtitle {
++font-family: Titillium Web;
++	color: #9D9D9D;
++	font-size: 26px;
++	font-weight: 700;
++	text-align: center
++}
++
++.margine {
++
++display: block;
++	padding-left: 10%;
++	padding-right: 10%;
++}
++
++.icon_image{
++		width: 18%;
++	max-width: 40%;
++	display: block;
++  margin-left: auto;
++  margin-right: auto;
++}
++
++.screen_image{
++	width: 60%;
++	max-width: 60%;
++	display: block;
++  margin-left: auto;
++  margin-right: auto;
++}
++
++.android_image{
++	width: 30%;
++	max-width: 60%;
++	display: block;
++  margin-left: auto;
++  margin-right: auto;
++}
++
++@media screen and (min-width: 600px) and (max-width: 1000px) {
++.screen_image{
++	width: 50%;
++	max-width: 60%;
++	display: block;
++  margin-left: auto;
++  margin-right: auto;
++}
++.android_image{
++	width: 50%;
++	max-width: 60%;
++	display: block;
++  margin-left: auto;
++  margin-right: auto;
++}
++	.icon_image{
++		width: 25%;
++	max-width: 40%;
++	display: block;
++  margin-left: auto;
++  margin-right: auto;
++}
++body {
++	font-size: 19px;
++	}
++}
++
++@media screen and (max-width: 600px) {
++.screen_image{
++	width: 60%;
++	max-width: 60%;
++	display: block;
++  margin-left: auto;
++  margin-right: auto;
++}
++.android_image{
++	width: 60%;
++	max-width: 60%;
++	display: block;
++  margin-left: auto;
++  margin-right: auto;
++}
++	.icon_image{
++		width: 30%;
++	max-width: 40%;
++	display: block;
++  margin-left: auto;
++  margin-right: auto;
++}
++body {
++	font-size: 17px;
++	}
++}
++</style>
++
++</head>
++
++<body>
++<div class="margine">
++  <p class="title">Come usare Cie ID</p>
++  <p class="subtitle">Sul browser web</p>
++  <p>&nbsp;</p>
++
++<ol>
++	<p>
++    Il browser web dovrebbe essere gi&agrave; correttamente configurato, se riscontri dei problemi potresti aver installato sul tuo sistema <a href="https://github.com/OpenSC/OpenSC/wiki" targets="_blank">OpenSC</a>.
++	</p>
++	<p>
++	Per risolvere il problema <strong>puoi disinstallare OpenSC</strong> oppure, alternativamente, puoi <strong>configurare OpenSC per ignorare il tuo lettore di smart card</strong>:
++	</p>
++	<ul>
++		<li>
++		Da riga di comando: lancia "opensc-tool --list-readers", sotto la voce "Name" troverai l'elenco dei lettori disponibili, prendi nota del nome del tuo lettore.
++		</li>
++		<li>
++        Apri il file di configurazione "opensc.conf" con un editor di testo (di solito si trova presso /etc/opensc.conf).
++		</li>
++		<li>
++		Inserisci "ignored_readers = nome del tuo lettore;" dentro le parentesi graffe di "app default".
++		</li>
++		<li>
++		Salva, ed esci.
++		</li>
++	</ul>
++	  <p>&nbsp;</p>
++	  Per autenticarti con la CIE, digita l’URL del servizio di tuo interesse e clicca sul pulsante <strong>Entra con CIE</strong>.
++	  <p>&nbsp;</p>
++	<img class="android_image" src="https://idserver.servizicie.interno.gov.it/idp/images/entra_con_cie.png" alt="image">
++  <p>&nbsp;</p>
++	  <p>&nbsp;</p>
++	  Quando richiesto, procedi ad effettuare l’abilitazione della tua CIE sul computer, necessaria solo per il primo utilizzo. Ti occorrerà il codice <a href="https://www.cartaidentita.interno.gov.it/cosa-pin-puk-utilizzarli/" target="_blank">PIN</a> composto da 4 cifre ricevute al momento di presentazione della domanda e altre 4 cifre che ti sono state recapitate a casa insieme alla nuova Carta di Identità Elettronica. <strong>Ricorda: dopo aver terminato l'abilitazione, ogni volta che ti sarà richiesto l'inserimento del PIN è necessario inserire solo le ultime 4 cifre del PIN.</strong><a href="https://www.cartaidentita.interno.gov.it/richiesta-di-ristampa/" target="_blank">Clicca qui</a> se hai smarrito il PIN.
++  <p>&nbsp;</p>
++	<img class="android_image" src="https://idserver.servizicie.interno.gov.it/idp/images/win_abbina.png" alt="image">
++  <p>&nbsp;</p>
++	  <p>&nbsp;</p>
++
++	  Terminata l’abilitazione, ti verrà richiesto di scegliere il certificato con cui accedere al servizio e di inserire la seconda metà del PIN.
++  <p>&nbsp;</p>
++	<img class="android_image" src="https://idserver.servizicie.interno.gov.it/idp/images/win_firefox_pin.png" alt="image">
++  <p>&nbsp;</p>
++	  <p>&nbsp;</p>
++
++	  Inserito il PIN, clicca su OK o premi INVIO per accedere al servizio. Ti verrà mostrato il certificato digitale con cui accedere. Clicca su OK per proseguire.
++  <p>&nbsp;</p>
++	<img class="android_image" src="https://idserver.servizicie.interno.gov.it/idp/images/win_firefox7.png" alt="image">
++  <p>&nbsp;</p>
++	  <p>&nbsp;</p>
++
++</ol>
++	 <p>In caso di difficoltà, contatta il servizio di assistenza per i cittadini secondo le modalità indicate all’indirizzo <a href="https://www.cartaidentita.interno.gov.it/contatti/" target="_blank">https://www.cartaidentita.interno.gov.it/contatti/</a>. Se vuoi cambiare il PIN o l’hai dimenticato e intendi cambiarlo (avrai bisogno del PUK) consulta il manuale del Software CIE per conoscere la procedura. Il manuale è disponibile all’indirizzo <a href="https://www.cartaidentita.interno.gov.it/software-cie/" target="_blank">https://www.cartaidentita.interno.gov.it/software-cie/.</a></p>
++
++	  <p>&nbsp;</p>
++</div>
++</body>
++</html>
+-- 
+2.43.5
+

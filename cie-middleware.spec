@@ -13,6 +13,7 @@ Source2:		logo.png
 Source3:		cieid.desktop
 Source4:		https://github.com/podofo/podofo/archive/0.9.6/podofo-0.9.6.tar.gz
 Source5:		pom.xml
+Source6:		libcie-pkcs11.module
 
 Patch1:			cie-middleware-common-fixup.patch
 Patch2:			cie-middleware-cie-pkcs11-fixup.patch
@@ -24,6 +25,9 @@ Patch7:			cie-middleware-fix-openssl.patch
 Patch8:			cie-middleware-fix-c++-std-headers.patch
 Patch9:			cie-middleware-keyboard-shortcuts.patch
 Patch10:			cie-middleware-fix-pkcs11-info-output.patch
+Patch11:			cie-middleware-fix-pkcs11-cant-lock.patch
+Patch12:			cie-middleware-fix-chromium-buffer-overflow.patch
+Patch13:			cie-middleware-override-tutorial.patch
 
 %if 0%{?fedora} < 40 || (0%{?rhel} && 0%{?rhel} < 10)
 BuildRequires:  maven-local-openjdk11
@@ -160,12 +164,22 @@ install -m 0644 %{SOURCE2} %{buildroot}%{_datadir}/pixmaps/cieid.png
 mkdir -p %{buildroot}%{_datadir}/applications
 install -m 0644 %{SOURCE3} %{buildroot}%{_datadir}/applications/cieid.desktop
 
+# Create pkcs11 module link
+mkdir -p %{buildroot}%{_libdir}/pkcs11
+ln -s ../libcie-pkcs11.so %{buildroot}%{_libdir}/pkcs11/libcie-pkcs11.so
+
+# Install module configuration for p11-kit
+mkdir -p %{buildroot}%{_datadir}/p11-kit/modules
+install -m 0644 %{SOURCE6} %{buildroot}%{_datadir}/p11-kit/modules/libcie-pkcs11.module
+
 %files -f .mfiles
 %license LICENSE
 %{_bindir}/cieid
 %{_libdir}/libcie-pkcs11.so
 %{_datadir}/pixmaps/cieid.png
 %{_datadir}/applications/cieid.desktop
+%{_libdir}/pkcs11/libcie-pkcs11.so
+%{_datadir}/p11-kit/modules/libcie-pkcs11.module
 
 %changelog
 %autochangelog
