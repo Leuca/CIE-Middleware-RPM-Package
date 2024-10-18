@@ -1,3 +1,5 @@
+%global podofo_ver 0.9.8
+
 Name:			cie-middleware
 Version:		1.4.3.9
 Release:		%autorelease
@@ -11,13 +13,13 @@ Source0:		https://github.com/italia/cie-middleware-linux/archive/%{version}/%{na
 Source1:		CMakeLists.txt
 Source2:		logo.png
 Source3:		cieid.desktop
-Source4:		https://github.com/podofo/podofo/archive/0.9.6/podofo-0.9.6.tar.gz
+Source4:		https://github.com/podofo/podofo/archive/%{podofo_ver}/podofo-%{podofo_ver}.tar.gz
 Source5:		pom.xml
 Source6:		libcie-pkcs11.module
 
 Patch1:			cie-middleware-common-fixup.patch
 Patch2:			cie-middleware-cie-pkcs11-fixup.patch
-Patch3:			cie-middleware-fix-podofo.patch
+Patch3:			cie-middleware-fix-pades.patch
 Patch4:			cie-middleware-fix-cryptopp.patch
 Patch5:			cie-middleware-merge-fix.patch
 Patch6:			cie-middleware-fix-pkcs11.patch
@@ -59,10 +61,11 @@ BuildRequires:	mvn(org.ghost4j:ghost4j)
 BuildRequires:	mvn(ch.swingfx:twinkle)
 
 Requires:		xmvn-tools
+Requires:		dejavu-sans-fonts
 
 # Bundle PoDoFo to avoid maintaining fixes for multiple versions
 # License: LGPL 2.0
-Provides:		bundled(podofo) = 0.9.6
+Provides:		bundled(podofo) = %{podofo_ver}
 
 %description
 Middleware for CIE (Carta di Identità Elettronica).
@@ -100,7 +103,7 @@ rm -f libcie/src/Sign/definitions.h
 
 # Unpack podofo
 tar xvf %{SOURCE4}
-mv podofo-0.9.6 podofo
+mv podofo-%{podofo_ver} podofo
 
 # Add our CMakeLists.txt for libcie-pkcs11
 install %{SOURCE1} CMakeLists.txt
@@ -126,9 +129,11 @@ export LDFLAGS="%{build_ldflags}"
 %__cmake \
 		-S podofo \
 		-B podofo_build \
+		-DWANT_FONTCONFIG:BOOL=TRUE \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DPODOFO_BUILD_LIB_ONLY:BOOL=TRUE \
 		-DPODOFO_BUILD_STATIC:BOOL=TRUE \
+		-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
 		-DCMAKE_CXX_FLAGS_RELEASE:STRING="-DNDEBUG" \
 		-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
 		-DCMAKE_INSTALL_DO_STRIP:BOOL=OFF \
