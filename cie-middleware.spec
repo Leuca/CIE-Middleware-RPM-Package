@@ -31,6 +31,7 @@ Patch11:			cie-middleware-fix-pkcs11-cant-lock.patch
 Patch12:			cie-middleware-fix-chromium-buffer-overflow.patch
 Patch13:			cie-middleware-override-tutorial.patch
 Patch14:			cie-middleware-reduce-verbosity.patch
+Patch15:			cie-middleware-improve-graphical-signature.patch
 
 %if 0%{?fedora} < 40 || (0%{?rhel} && 0%{?rhel} < 10)
 BuildRequires:  maven-local-openjdk11

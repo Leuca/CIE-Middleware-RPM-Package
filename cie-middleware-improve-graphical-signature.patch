@@ -1,0 +1,40 @@
+From 113b02c0e5a4d889166174aaa1a8c58fc0940f65 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sat, 19 Oct 2024 11:23:42 +0200
+Subject: [PATCH] CIEID: PADES: Improve graphical signature preview and make a
+ smaller graphical signature
+
+Make the background of the signature transparent.
+Shrink the signature.
+Make the border dashed.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ CIEID/src/it/ipzs/cieid/Firma/MoveablePicture.java | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/CIEID/src/it/ipzs/cieid/Firma/MoveablePicture.java b/CIEID/src/it/ipzs/cieid/Firma/MoveablePicture.java
+index 302c75a..e05fdcd 100644
+--- a/CIEID/src/it/ipzs/cieid/Firma/MoveablePicture.java
++++ b/CIEID/src/it/ipzs/cieid/Firma/MoveablePicture.java
+@@ -21,13 +21,13 @@ public class MoveablePicture extends JPanel implements MouseListener, MouseMotio
+ 	
+ 	public MoveablePicture(String signFilePath) {
+ 		// TODO Auto-generated constructor stub
+-		this.setSize(90, 25);
+-		this.setBackground(Color.white);
+-		this.setBorder(BorderFactory.createLineBorder(Color.black));
++		this.setSize(50, 25);
++		this.setBackground(new Color(255, 255, 255, 0));
++		this.setBorder(BorderFactory.createDashedBorder(Color.black));
+ 		try {
+ 			Image img;
+ 			img = ImageIO.read(new File(signFilePath));
+-			JLabel imgLabel = new JLabel(new ImageIcon(img.getScaledInstance(this.getWidth()-5, this.getHeight()-10, Image.SCALE_SMOOTH)));
++			JLabel imgLabel = new JLabel(new ImageIcon(img.getScaledInstance(this.getWidth(), this.getHeight(), Image.SCALE_SMOOTH)));
+ 			this.add(imgLabel);
+ 		} catch (IOException e) {
+ 			// TODO Auto-generated catch block
+-- 
+2.43.5
+
