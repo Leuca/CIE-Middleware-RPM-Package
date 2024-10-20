@@ -1,24 +1,23 @@
-From 536b26734b6068c3477402e3b8c38e08caaaf30e Mon Sep 17 00:00:00 2001
+From 6298d0b8f11bb756a0529a783a85e555e5049c83 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
-Date: Fri, 18 Oct 2024 22:22:49 +0200
+Date: Sun, 20 Oct 2024 03:29:27 +0200
 Subject: [PATCH] cie_sign_sdk: PdfSignatureGenerator: Rewrite implementation
  of PADES signature
 
 As of now the code relies on a closed-source version of PoDoFo.
 Write a new implementation of the PdfSignatureGenerator class based on
 the code from podofosign and the old code of the class. Try to match
-behaviour of the program to the behaviour of versions of this project
-for other platforms.
-Use PoDoFo open-source version 0.9.8 to write the implementation.
+behaviour to the behaviour of versions for other platforms.
+Use open-source PoDoFo version 0.9.8 API.
 Also fix loading document for verification with the correct method.
 
 Signed-off-by: Luca Magrone <luca@magrone.cc>
 ---
  CIEID/src/it/ipzs/cieid/MainFrame.java       |   6 +-
  cie_sign_sdk/include/PdfSignatureGenerator.h |   2 -
- cie_sign_sdk/src/PdfSignatureGenerator.cpp   | 303 ++++++++++---------
+ cie_sign_sdk/src/PdfSignatureGenerator.cpp   | 301 ++++++++++---------
  cie_sign_sdk/src/PdfVerifier.cpp             |   6 +-
- 4 files changed, 169 insertions(+), 148 deletions(-)
+ 4 files changed, 169 insertions(+), 146 deletions(-)
 
 diff --git a/CIEID/src/it/ipzs/cieid/MainFrame.java b/CIEID/src/it/ipzs/cieid/MainFrame.java
 index ac56eca..cfe9270 100644
@@ -60,10 +59,18 @@ index 5a19d6f..024d107 100644
  	
  	const double getHeight(int pageIndex);
 diff --git a/cie_sign_sdk/src/PdfSignatureGenerator.cpp b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
-index be4dc0c..3346e0e 100644
+index be4dc0c..a0c4726 100644
 --- a/cie_sign_sdk/src/PdfSignatureGenerator.cpp
 +++ b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
-@@ -12,6 +12,10 @@
+@@ -6,12 +6,18 @@
+  *  Copyright 2012 __MyCompanyName__. All rights reserved.
+  *
+  */
++#include <iostream>
++#include <fstream>
+ 
+ #include "PdfSignatureGenerator.h"
+ #include "PdfVerifier.h"
  #include "UUCLogger.h"
  
  #define SINGNATURE_SIZE 10000
@@ -74,7 +81,7 @@ index be4dc0c..3346e0e 100644
  
  #ifdef CreateFont
  #undef CreateFont
-@@ -27,10 +31,7 @@ USE_LOG;
+@@ -27,10 +33,7 @@ USE_LOG;
  
  PdfSignatureGenerator::PdfSignatureGenerator()
  : m_pPdfDocument(NULL), m_pSignatureField(NULL), m_pSignOutputDevice(NULL), m_pFinalOutDevice(NULL),
@@ -86,7 +93,7 @@ index be4dc0c..3346e0e 100644
  
  PdfSignatureGenerator::~PdfSignatureGenerator()
  {
-@@ -61,25 +62,16 @@ int PdfSignatureGenerator::Load(const char* pdf, int len)
+@@ -61,25 +64,16 @@ int PdfSignatureGenerator::Load(const char* pdf, int len)
  	
  	try
  	{
@@ -116,7 +123,7 @@ index be4dc0c..3346e0e 100644
  	}
      catch(::PoDoFo::PdfError& err)
      {
-@@ -91,16 +83,6 @@ int PdfSignatureGenerator::Load(const char* pdf, int len)
+@@ -91,16 +85,6 @@ int PdfSignatureGenerator::Load(const char* pdf, int len)
  	}
  }
  
@@ -133,7 +140,7 @@ index be4dc0c..3346e0e 100644
  void PdfSignatureGenerator::InitSignature(int pageIndex, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter)
  {
  	LOG_DBG((0, "quella con tutti 0\n", ""));
-@@ -115,187 +97,227 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+@@ -115,187 +99,227 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
  
  void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter, const char* szImagePath, const char* szDescription, const char* szGraphometricData, const char* szVersion)
  {
@@ -165,7 +172,7 @@ index be4dc0c..3346e0e 100644
 +	float height0 = height * cropBoxHeight;
      
 +	LOG_DBG((0, "InitSignature", "m_actualLen %d", m_actualLen));
-+	int fulllen = m_actualLen * 2 + SINGNATURE_SIZE * 2 + (szGraphometricData ? (strlen(szGraphometricData) + strlen(szVersion) + 100) : 0);
++	int fulllen = m_actualLen * 2 + SINGNATURE_SIZE * 2;
 +
 +	printf("pdf rect: %f, %f, %f, %f\n", left0, bottom0, width0, height0);
 +
@@ -275,25 +282,30 @@ index be4dc0c..3346e0e 100644
 -		}
 -	}
 -	
-+			PdfImage image(m_pPdfDocument);
-+			double scale;
- 
+-
 -	if(szGraphometricData && szGraphometricData[0])
 -		m_pSignatureField->SetGraphometricData(PdfString("Aruba_Sign_Biometric_Data"), PdfString(szGraphometricData), PdfString(szVersion));
-+			// Generate signature string
-+			std::string signatureStamp;
- 
+-
 -	LOG_DBG((0, "InitSignature", "szGraphometricData OK"));
-+			// Append date
-+			if(szName && szName[0])
-+				signatureStamp.append(szName);
- 
-+			// Append name
-+			if(szReason && szReason[0])
++			char* imgBuffer;
++			double scale;
++			streampos imgBufferSize;
++			ifstream img(szImagePath, ios::in|ios::binary|ios::ate);
++			std::string signatureStamp;
++			PdfImage image(m_pPdfDocument);
++
++			// Copy the image in a buffer
++			if(img.is_open())
 +			{
-+				signatureStamp.append("\n");
-+				signatureStamp.append(szReason);
++				imgBufferSize = img.tellg();
++				imgBuffer = new char[imgBufferSize];
++				img.seekg(0, ios::beg);
++				img.read(imgBuffer, imgBufferSize);
++				img.close();
 +			}
+ 
++			// Increase space we have to allocate
++			fulllen += imgBufferSize * 2;
  
 -	//	// crea il nuovo doc con il campo di firma
 -	//	int fulllen = m_actualLen * 3 + SINGNATURE_SIZE * 2;
@@ -305,9 +317,19 @@ index be4dc0c..3346e0e 100644
 -    LOG_DBG((0, "InitSignature", "m_actualLen %d", m_actualLen));
 -	// crea il nuovo doc con il campo di firma
 -	int fulllen = m_actualLen * 2 + SINGNATURE_SIZE * 2 + (szGraphometricData ? (strlen(szGraphometricData) + strlen(szVersion) + 100) : 0);
--
++			// Generate signature string
++			// Append date
++			if(szName && szName[0])
++				signatureStamp.append(szName);
+ 
 -	
--
++			// Append name
++			if(szReason && szReason[0])
++			{
++				signatureStamp.append("\n");
++				signatureStamp.append(szReason);
++			}
+ 
 -	int mainDoclen = 0;
 -	m_pMainDocbuffer = NULL;
 -	while (!m_pMainDocbuffer) {
@@ -317,7 +339,7 @@ index be4dc0c..3346e0e 100644
 -			PdfOutputDevice pdfOutDevice(m_pMainDocbuffer, fulllen);
 -			m_pPdfDocument->Write(&pdfOutDevice);
 -			mainDoclen = pdfOutDevice.GetLength();
-+			image.LoadFromPng(szImagePath);
++			image.LoadFromPngData((const unsigned char*)imgBuffer, imgBufferSize);
 +			// Scale using width to try to avoid squeezing image
 +			scale = (width0 / image.GetWidth());
 +
@@ -326,6 +348,9 @@ index be4dc0c..3346e0e 100644
 +			painter.Save();
 +			painter.Restore();
 +			painter.DrawImage(left0, bottom0, &image, scale, scale);
++
++			// Release buffer memory
++			delete[] imgBuffer;
 +
 +			// Create signature stamp
 +			PdfFont* font = m_pPdfDocument->CreateFont(FONT_NAME, false,
@@ -377,73 +402,53 @@ index be4dc0c..3346e0e 100644
  
 -	
 -	// alloca un SignOutputDevice
--	m_pSignDocbuffer = new char[fulllen];
 +	// Set SubFilter
 +	if(szSubFilter && szSubFilter[0])
 +	{
 +		m_pSignatureField->GetSignatureObject()->GetDictionary().AddKey("SubFilter",
 +					PdfName(szSubFilter));
 +	}
- 
--	LOG_DBG((0, "InitSignature", "m_pSignDocbuffer %d", fulllen));
++
 +	// Add /SigFlags
 +	pdf_int64 flags = 3;
 +	m_pPdfDocument->GetAcroForm()->GetObject()->GetDictionary().AddKey(PdfName("SigFlags"),
 +			PdfObject(flags));
++
++	LOG_DBG((0, "InitSignature", "fulllen %d", fulllen));
++
+ 	m_pSignDocbuffer = new char[fulllen];
+ 
+ 	LOG_DBG((0, "InitSignature", "m_pSignDocbuffer %d", fulllen));
  
 -	m_pFinalOutDevice = new PdfOutputDevice(m_pSignDocbuffer, fulllen);		
--	m_pSignOutputDevice = new PdfSignOutputDevice(m_pFinalOutDevice);
-+	// Keep trying to write the final document until we don't catch an error.
-+	// Double buffer lenght on error.
-+	m_pSignDocbuffer = NULL;
-+	while (!m_pSignDocbuffer) {
-+		try
-+		{
-+			LOG_DBG((0, "InitSignature", "fulllen %d", fulllen));
++	m_pFinalOutDevice = new PdfOutputDevice(m_pSignDocbuffer, fulllen);
+ 	m_pSignOutputDevice = new PdfSignOutputDevice(m_pFinalOutDevice);
  
--	LOG_DBG((0, "InitSignature", "buffers OK %d", fulllen));
-+			m_pSignDocbuffer = new char[fulllen];
+ 	LOG_DBG((0, "InitSignature", "buffers OK %d", fulllen));
  
 -	// imposta la firma
--	m_pSignOutputDevice->SetSignatureSize(SINGNATURE_SIZE);
+ 	m_pSignOutputDevice->SetSignatureSize(SINGNATURE_SIZE);
 -	
 -	LOG_DBG((0, "InitSignature", "SetSignatureSize OK %d", SINGNATURE_SIZE));
-+			LOG_DBG((0, "InitSignature", "m_pSignDocbuffer %d", fulllen));
- 
+-
 -	// Scrive il documento reale
 -	m_pSignOutputDevice->Write(m_pMainDocbuffer, mainDoclen);
-+			m_pFinalOutDevice = new PdfOutputDevice(m_pSignDocbuffer, fulllen);
-+			m_pSignOutputDevice = new PdfSignOutputDevice(m_pFinalOutDevice);
  
 -	LOG_DBG((0, "InitSignature", "Write OK %d", mainDoclen));
-+			LOG_DBG((0, "InitSignature", "buffers OK %d", fulllen));
- 
+-
 -	m_pSignOutputDevice->AdjustByteRange();
-+			m_pSignOutputDevice->SetSignatureSize(SINGNATURE_SIZE);
- 
+-
 -	LOG_DBG((0, "InitSignature", "AdjustByteRange OK"));
-+			LOG_DBG((0, "InitSignature", "SetSignatureSize OK %d", SINGNATURE_SIZE));
++	LOG_DBG((0, "InitSignature", "SetSignatureSize OK %d", SINGNATURE_SIZE));
  
-+			m_pSignatureField->SetSignature(*m_pSignOutputDevice->GetSignatureBeacon());
-+
-+			m_pPdfDocument->WriteUpdate(m_pSignOutputDevice);
-+		}
-+		catch(::PoDoFo::PdfError err)
-+		{
-+			if(m_pSignDocbuffer) {
-+			        delete m_pSignDocbuffer;
-+			        m_pSignDocbuffer = NULL;
-+			}
-+			if(m_pFinalOutDevice)
-+				delete m_pFinalOutDevice;
-+			if(m_pSignOutputDevice)
-+				delete m_pSignOutputDevice;
-+
-+			LOG_DBG((0, "PdfError", "what %s", err.what()));
-+			printf("Allocating bigger buffer...\n");
-+
-+			fulllen *= 2;
-+		}
++	m_pSignatureField->SetSignature(*m_pSignOutputDevice->GetSignatureBeacon());
++	try
++	{
++		m_pPdfDocument->WriteUpdate(m_pSignOutputDevice);
++	}
++	catch(::PoDoFo::PdfError err)
++	{
++		printf("PdfError: %s\n", err.what());
 +	}
  }
  
@@ -474,7 +479,7 @@ index be4dc0c..3346e0e 100644
  	delete buffer;
  }
  
-@@ -303,6 +325,7 @@ void PdfSignatureGenerator::SetSignature(const char* signature, int len)
+@@ -303,6 +327,7 @@ void PdfSignatureGenerator::SetSignature(const char* signature, int len)
  {
  	PdfData signatureData(signature, len);
  	m_pSignOutputDevice->SetSignature(signatureData);
