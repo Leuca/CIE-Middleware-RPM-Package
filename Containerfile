@@ -9,7 +9,6 @@ RUN rpmdev-setuptree
 # Download sources
 WORKDIR /root/rpmbuild/SOURCES
 RUN wget $(spectool -S /project/cie-middleware.spec 2>/dev/null | grep Source0 | cut -d" " -f 2)
-RUN wget $(spectool -S /project/cie-middleware.spec 2>/dev/null | grep Source4 | cut -d" " -f 2)
 
 # Generate specfile with correct versioning
 WORKDIR /project

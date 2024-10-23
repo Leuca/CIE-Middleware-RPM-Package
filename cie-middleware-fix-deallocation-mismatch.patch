@@ -1,0 +1,281 @@
+From 4b6a493e544d0f5893c479732f8ec63d97132b96 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Mon, 21 Oct 2024 17:42:45 +0200
+Subject: [PATCH] Fix mismatched allocation-deallocation syntax
+
+As per C++ standard you should match every new with a delete
+and every new [] with a delete [].
+
+Also don't declare deconstructor that we do not implement.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/CSP/FirmaConCIE.cpp                 |  4 ++--
+ cie-pkcs11/Sign/CIESign.h                      |  2 --
+ cie_sign_sdk/src/ASN1/ASN1Object.cpp           |  4 ++--
+ cie_sign_sdk/src/ASN1/ASN1ObjectIdentifier.cpp |  4 ++--
+ cie_sign_sdk/src/ASN1/Certificate.cpp          |  4 ++--
+ cie_sign_sdk/src/PdfSignatureGenerator.cpp     |  6 +++---
+ cie_sign_sdk/src/SignedDocument.cpp            |  4 ++--
+ cie_sign_sdk/src/UUCProperties.cpp             | 12 ++++++------
+ cie_sign_sdk/src/UUCTextFileWriter.cpp         |  4 ++--
+ cie_sign_sdk/src/disigonsdk.cpp                |  8 ++++----
+ 10 files changed, 25 insertions(+), 27 deletions(-)
+
+diff --git a/cie-pkcs11/CSP/FirmaConCIE.cpp b/cie-pkcs11/CSP/FirmaConCIE.cpp
+index 14bfe14..050d282 100644
+--- a/cie-pkcs11/CSP/FirmaConCIE.cpp
++++ b/cie-pkcs11/CSP/FirmaConCIE.cpp
+@@ -145,8 +145,8 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+             
+             LOG_INFO("firmaConCIE - completed, res: %d", ret);
+ 
+-            free(ias);
+-            free(cieSign);
++            delete ias;
++            delete cieSign;
+ 
+             completedCallBack(ret);
+         }
+diff --git a/cie-pkcs11/Sign/CIESign.h b/cie-pkcs11/Sign/CIESign.h
+index 78221be..4e9d037 100644
+--- a/cie-pkcs11/Sign/CIESign.h
++++ b/cie-pkcs11/Sign/CIESign.h
+@@ -13,8 +13,6 @@ private:
+ public:
+ 	CIESign(IAS *ias);
+ 
+-	~CIESign();
+-
+ 	//sign: (NSString*)nis url : (NSURL*)url type : (NSString*)type pin : (NSString*)pin page : (int)page x : (float)x y : (float)y w : (float)w h : (float)h response : (NSMutableString*)response
+ 	
+ 	uint16_t sign(const char* inFilePath, const char* type, const char* pin, int page, float x, float y, float w, float h, const char* imagePathFile, const char* outFilePath);
+diff --git a/cie_sign_sdk/src/ASN1/ASN1Object.cpp b/cie_sign_sdk/src/ASN1/ASN1Object.cpp
+index f3c90f1..56b6ca7 100644
+--- a/cie_sign_sdk/src/ASN1/ASN1Object.cpp
++++ b/cie_sign_sdk/src/ASN1/ASN1Object.cpp
+@@ -321,13 +321,13 @@ int CASN1Object::parseLen(UUCBufferedReader& reader, BYTE* pbtTag, UUCByteArray*
+ 		unsigned int n;
+ 		if ((n = reader.read(pbtVal, nLen)) < nLen)
+ 		{
+-			delete pbtVal;
++			delete[] pbtVal;
+ 			throw CASN1ParsingException();
+ 		}
+ 
+ 		pValue->append(pbtVal, nLen);
+ 
+-		delete pbtVal;
++		delete[] pbtVal;
+ 	}
+ 	return nLen;
+ }
+diff --git a/cie_sign_sdk/src/ASN1/ASN1ObjectIdentifier.cpp b/cie_sign_sdk/src/ASN1/ASN1ObjectIdentifier.cpp
+index 4c695d1..e8628f6 100644
+--- a/cie_sign_sdk/src/ASN1/ASN1ObjectIdentifier.cpp
++++ b/cie_sign_sdk/src/ASN1/ASN1ObjectIdentifier.cpp
+@@ -42,7 +42,7 @@ CASN1ObjectIdentifier::CASN1ObjectIdentifier(const char* strObjId)
+ 	UINT nFirst = 40 * atoi(szTok) + atoi(strtok(NULL, "."));
+ 	if(nFirst > 0xff)
+ 	{
+-		delete szOID;
++		delete[] szOID;
+ 		throw -1;//new CASN1BadObjectIdException(strObjId);
+ 	}
+ 	out[nIndex] = nFirst;
+@@ -86,7 +86,7 @@ CASN1ObjectIdentifier::CASN1ObjectIdentifier(const char* strObjId)
+ 	
+ 	setValue(UUCByteArray(out, nIndex));
+ 	
+-	delete szOID;
++	delete[] szOID;
+ 	
+ }
+ 		
+diff --git a/cie_sign_sdk/src/ASN1/Certificate.cpp b/cie_sign_sdk/src/ASN1/Certificate.cpp
+index c16995b..6529c5f 100644
+--- a/cie_sign_sdk/src/ASN1/Certificate.cpp
++++ b/cie_sign_sdk/src/ASN1/Certificate.cpp
+@@ -89,11 +89,11 @@ CCertificate* CCertificate::createCertificate(UUCByteArray& contentArray)
+ 
+ 		UUCBufferedReader reader((BYTE*)szDecoded, decLen);
+ 
+-		delete szContent;
++		delete[] szContent;
+ 		
+ 		CCertificate* pCert = new CCertificate(reader);
+ 	
+-		free(szDecoded);
++		delete[] szDecoded;
+ 
+ 		return pCert;
+ 
+diff --git a/cie_sign_sdk/src/PdfSignatureGenerator.cpp b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
+index 9fbd54e..fa5e038 100644
+--- a/cie_sign_sdk/src/PdfSignatureGenerator.cpp
++++ b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
+@@ -57,7 +57,7 @@ PdfSignatureGenerator::~PdfSignatureGenerator()
+ 		delete m_pFinalOutDevice;
+ 	
+ 	if(m_pSignDocbuffer)
+-		delete m_pSignDocbuffer;
++		delete[] m_pSignDocbuffer;
+ #endif
+ }
+ 
+@@ -400,7 +400,7 @@ void PdfSignatureGenerator::GetBufferForSignature(UUCByteArray& toSign)
+ 
+ 	toSign.append((BYTE*)buffer, nRead);
+ 
+-	delete buffer;
++	delete[] buffer;
+ }
+ 
+ void PdfSignatureGenerator::SetSignature(const char* signature, int len)
+@@ -426,7 +426,7 @@ void PdfSignatureGenerator::GetSignedPdf(UUCByteArray& signedPdf)
+ 	signedPdf.append((BYTE*)szSignedPdf, finalLength);
+ #endif
+ 
+-	delete szSignedPdf;
++	delete[] szSignedPdf;
+ }
+ 
+ const double PdfSignatureGenerator::getWidth(int pageIndex) {
+diff --git a/cie_sign_sdk/src/SignedDocument.cpp b/cie_sign_sdk/src/SignedDocument.cpp
+index f003a5a..a20b011 100644
+--- a/cie_sign_sdk/src/SignedDocument.cpp
++++ b/cie_sign_sdk/src/SignedDocument.cpp
+@@ -79,8 +79,8 @@ CSignedDocument::CSignedDocument(const BYTE* content, int len)
+ 			c.append((BYTE*)szDecoded, decLen);
+ 
+ 			//LOG_DBG((0, "CSignedDocument", "append"));
+-			delete szContent;
+-			delete szEncoded;
++			delete[] szContent;
++			delete[] szEncoded;
+ 		}
+ 		catch(...)
+ 		{
+diff --git a/cie_sign_sdk/src/UUCProperties.cpp b/cie_sign_sdk/src/UUCProperties.cpp
+index 1fd7659..b012bca 100644
+--- a/cie_sign_sdk/src/UUCProperties.cpp
++++ b/cie_sign_sdk/src/UUCProperties.cpp
+@@ -144,7 +144,7 @@ long UUCProperties::save(const char* szFilePath, const char* szHeader) const
+ 			szLine = new char[strlen(szHeader) + 3];
+ 			sprintf(szLine, "#%s", szHeader);
+ 			textFileWriter.writeLine(szLine);
+-			delete szLine;
++			delete[] szLine;
+ 		}
+ 
+ 		time_t ltime;
+@@ -154,7 +154,7 @@ long UUCProperties::save(const char* szFilePath, const char* szHeader) const
+ 		szLine = new char[255];
+ 		sprintf(szLine, "#%s", ctime( &ltime ) );		
+ 		textFileWriter.writeLine(szLine);
+-		delete szLine;
++		delete[] szLine;
+ 
+ 		// iterate in the hashtable
+ 		char* szName;
+@@ -169,7 +169,7 @@ long UUCProperties::save(const char* szFilePath, const char* szHeader) const
+ 			szLine = new char[strlen(szName) + strlen(szValue) + 2];
+ 			sprintf(szLine, "%s=%s", szName, szValue);	    	   
+ 			textFileWriter.writeLine(szLine);
+-			delete szLine; 
++			delete[] szLine;
+ 		}				
+ 	}
+ 	catch(long nErr)
+@@ -199,7 +199,7 @@ long UUCProperties::save(UUCByteArray& props, const char* szHeader) const
+ 			szLine = new char[strlen(szHeader) + 4];
+ 			sprintf(szLine, "#%s\r\n", szHeader);
+ 			props.append((BYTE*)szLine, strlen(szLine));
+-			delete szLine;
++			delete[] szLine;
+ 		}
+ 
+ 		time_t ltime;
+@@ -209,7 +209,7 @@ long UUCProperties::save(UUCByteArray& props, const char* szHeader) const
+ 		szLine = new char[255];
+ 		sprintf(szLine, "#%s\r\n", ctime( &ltime ) );		
+ 		props.append((BYTE*)szLine, strlen(szLine));
+-		delete szLine;
++		delete[] szLine;
+ 
+ 		// iterate in the hashtable
+ 		char* szName;
+@@ -224,7 +224,7 @@ long UUCProperties::save(UUCByteArray& props, const char* szHeader) const
+ 			szLine = new char[strlen(szName) + strlen(szValue) + 2 + 3];
+ 			sprintf(szLine, "%s=%s\r\n", szName, szValue);	    	   
+ 			props.append((BYTE*)szLine, strlen(szLine));
+-			delete szLine; 
++			delete[] szLine;
+ 		}				
+ 	}
+ 	catch(long nErr)
+diff --git a/cie_sign_sdk/src/UUCTextFileWriter.cpp b/cie_sign_sdk/src/UUCTextFileWriter.cpp
+index e0a12a0..9b483c5 100644
+--- a/cie_sign_sdk/src/UUCTextFileWriter.cpp
++++ b/cie_sign_sdk/src/UUCTextFileWriter.cpp
+@@ -42,7 +42,7 @@ long UUCTextFileWriter::writeLine(const UUCByteArray& byteArray)
+ 
+ 	if(fprintf(m_pf, "%s\n", pszLine) < 0)
+ 	{
+-		delete pszLine;
++		delete[] pszLine;
+ 		#ifdef WIN32
+ 		return GetLastError();
+ #else
+@@ -50,7 +50,7 @@ long UUCTextFileWriter::writeLine(const UUCByteArray& byteArray)
+ #endif
+ 	}
+ 
+-	delete pszLine;
++	delete[] pszLine;
+ 	fflush(m_pf);
+ 
+ 	return 0;
+diff --git a/cie_sign_sdk/src/disigonsdk.cpp b/cie_sign_sdk/src/disigonsdk.cpp
+index 7424904..3e20beb 100644
+--- a/cie_sign_sdk/src/disigonsdk.cpp
++++ b/cie_sign_sdk/src/disigonsdk.cpp
+@@ -1163,7 +1163,7 @@ long verify_xml(DISIGON_VERIFY_CONTEXT* pContext, VERIFY_INFO* pVerifyInfo)
+             sprintf(szAux, "%s:%s", szoid, hexval);
+             pSI->pszExtensions[j] = new char[strlen(szAux) + 1];
+             strcpy(pSI->pszExtensions[j], szAux);
+-            delete szAux;
++            delete[] szAux;
+         }
+ 
+         UUCByteArray issuer;
+@@ -1453,7 +1453,7 @@ SIGNER_INFO* verify_countersignature(DISIGON_VERIFY_CONTEXT* pContext, CSignerIn
+                 sprintf(szAux, "%s:%s", szoid, hexval);
+                 pSI->pszExtensions[j] = new char[strlen(szAux) + 1];
+                 strcpy(pSI->pszExtensions[j], szAux);
+-                delete szAux;
++                delete[] szAux;
+             }
+ 
+             //LOG_DBG((0, "verify_signed_document 2", "Estension OK"));
+@@ -1703,7 +1703,7 @@ long verify_signed_document(int index, DISIGON_VERIFY_CONTEXT* pContext, CSigned
+             sprintf(szAux, "%s:%s", szoid, hexval);
+             pSI->pszExtensions[j] = new char[strlen(szAux) + 1];
+             strcpy(pSI->pszExtensions[j], szAux);
+-            delete szAux;
++            delete[] szAux;
+         }
+ 
+         //LOG_DBG((0, "verify_signed_document 2", "Estension OK"));
+@@ -2180,7 +2180,7 @@ long verify_pdf(DISIGON_VERIFY_CONTEXT* pContext, UUCByteArray& data, VERIFY_INF
+             sprintf(szAux, "%s:%s", szoid, hexval);
+             pSI->pszExtensions[j] = new char[strlen(szAux) + 1];
+             strcpy(pSI->pszExtensions[j], szAux);
+-            delete szAux;
++            delete[] szAux;
+         }
+ 
+ 
+-- 
+2.43.5
+

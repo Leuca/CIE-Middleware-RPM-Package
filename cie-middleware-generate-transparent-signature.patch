@@ -1,0 +1,39 @@
+From b4e5140d79b7ba308bca526ce911b070abf2346a Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Wed, 23 Oct 2024 02:52:18 +0200
+Subject: [PATCH] CIEID: Generate transparent graphical signature
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ CIEID/src/it/ipzs/cieid/MainFrame.java | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/CIEID/src/it/ipzs/cieid/MainFrame.java b/CIEID/src/it/ipzs/cieid/MainFrame.java
+index 1c42a7e..c6204aa 100644
+--- a/CIEID/src/it/ipzs/cieid/MainFrame.java
++++ b/CIEID/src/it/ipzs/cieid/MainFrame.java
+@@ -2845,7 +2845,7 @@ public class MainFrame extends JFrame {
+ 
+     private void drawText(String text, String path) {
+         BufferedImage bufferedImage = new BufferedImage(1, 1,
+-                BufferedImage.TYPE_INT_RGB);
++                BufferedImage.TYPE_INT_ARGB);
+         Graphics graphics = bufferedImage.getGraphics();
+ 
+         try {
+@@ -2890,10 +2890,10 @@ public class MainFrame extends JFrame {
+             graphics.setFont(customFont.deriveFont(Font.LAYOUT_LEFT_TO_RIGHT, 150f));
+             FontMetrics fM = graphics.getFontMetrics();
+             bufferedImage = new BufferedImage(fM.stringWidth(text), fM.getHeight(),
+-                                              BufferedImage.TYPE_INT_RGB);
++                                              BufferedImage.TYPE_INT_ARGB);
+             graphics = bufferedImage.getGraphics();
+             graphics.setFont(customFont.deriveFont(Font.LAYOUT_LEFT_TO_RIGHT, 150f));
+-            graphics.setColor(Color.white);
++            graphics.setColor(new Color(255, 255, 255,0));
+             graphics.fillRect(0, 0, fM.stringWidth(text), fM.getHeight());
+             graphics.setColor(Color.BLACK);
+             graphics.drawString(text, 0, fM.getAscent());
+-- 
+2.43.5
+

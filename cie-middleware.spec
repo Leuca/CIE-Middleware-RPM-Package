@@ -1,10 +1,8 @@
-%global podofo_ver 0.9.8
-
 Name:			cie-middleware
 Version:		1.4.3.9
 Release:		%autorelease
 Summary:		Middleware for CIE (Italian Electronic ID Card)
-License:		(BSD-3-Clause AND LGPL-2.0)
+License:		BSD-3-Clause
 URL:			https://github.com/italia/cie-middleware-linux
 
 ExclusiveArch:	%{java_arches}
@@ -13,9 +11,8 @@ Source0:		https://github.com/italia/cie-middleware-linux/archive/%{version}/%{na
 Source1:		CMakeLists.txt
 Source2:		logo.png
 Source3:		cieid.desktop
-Source4:		https://github.com/podofo/podofo/archive/%{podofo_ver}/podofo-%{podofo_ver}.tar.gz
-Source5:		pom.xml
-Source6:		libcie-pkcs11.module
+Source4:		pom.xml
+Source5:		libcie-pkcs11.module
 
 Patch1:			cie-middleware-common-fixup.patch
 Patch2:			cie-middleware-cie-pkcs11-fixup.patch
@@ -32,6 +29,8 @@ Patch12:			cie-middleware-fix-chromium-buffer-overflow.patch
 Patch13:			cie-middleware-override-tutorial.patch
 Patch14:			cie-middleware-reduce-verbosity.patch
 Patch15:			cie-middleware-improve-graphical-signature.patch
+Patch16:			cie-middleware-fix-deallocation-mismatch.patch
+Patch17:			cie-middleware-generate-transparent-signature.patch
 
 %if 0%{?fedora} < 40 || (0%{?rhel} && 0%{?rhel} < 10)
 BuildRequires:  maven-local-openjdk11
@@ -55,6 +54,7 @@ BuildRequires:	openssl-devel-engine
 BuildRequires:	zlib-devel
 BuildRequires:	fontconfig-devel
 BuildRequires:	pcsc-lite-devel
+BuildRequires:	podofo-devel
 
 BuildRequires:	mvn(com.google.code.gson:gson)
 BuildRequires:	mvn(net.java.dev.jna:jna)
@@ -64,10 +64,6 @@ BuildRequires:	mvn(ch.swingfx:twinkle)
 Requires:		xmvn-tools
 Requires:		dejavu-sans-fonts
 
-# Bundle PoDoFo to avoid maintaining fixes for multiple versions
-# License: LGPL 2.0
-Provides:		bundled(podofo) = %{podofo_ver}
-
 %description
 Middleware for CIE (Carta di Identità Elettronica).
 A Java app to sign and verify documents and to manage the card.
@@ -76,7 +72,7 @@ A PKCS11 library to allow programs to use the card.
 %{?javadoc_package}
 
 %prep
-%autosetup -n %{name}-linux-%{version} -p1 -Sgit
+%autosetup -n %{name}-linux-%{version} -p1
 
 # Remove pre-compiled static libs
 rm -rf cie_sign_sdk/Dependencies
@@ -102,10 +98,6 @@ rm -f cie-pkcs11/Util/UUC*
 cp -rf cie-pkcs11/* libcie/src/
 rm -f libcie/src/Sign/definitions.h
 
-# Unpack podofo
-tar xvf %{SOURCE4}
-mv podofo-%{podofo_ver} podofo
-
 # Add our CMakeLists.txt for libcie-pkcs11
 install %{SOURCE1} CMakeLists.txt
 
@@ -115,7 +107,7 @@ sed -i '0,/cryptopp/s/cryptopp/libcryptopp/' CMakeLists.txt
 %endif
 
 # Install CIEID pom.xml file
-install %{SOURCE5} pom.xml
+install %{SOURCE4} pom.xml
 
 # Remove jar artifacts
 rm -rf CIEID/lib
@@ -124,27 +116,6 @@ rm -rf CIEID/lib
 %mvn_file :cieid cieid/cieid cieid
 
 %build
-# Build and fake-install PoDoFo
-export CXXFLAGS="%{optflags}"
-export LDFLAGS="%{build_ldflags}"
-%__cmake \
-		-S podofo \
-		-B podofo_build \
-		-DWANT_FONTCONFIG:BOOL=TRUE \
-		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		-DPODOFO_BUILD_LIB_ONLY:BOOL=TRUE \
-		-DPODOFO_BUILD_STATIC:BOOL=TRUE \
-		-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-		-DCMAKE_CXX_FLAGS_RELEASE:STRING="-DNDEBUG" \
-		-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
-		-DCMAKE_INSTALL_DO_STRIP:BOOL=OFF \
-		-DCMAKE_INSTALL_PREFIX:PATH=/ \
-		-DINCLUDE_INSTALL_DIR:PATH=/include	\
-		-DLIB_INSTALL_DIR:PATH=/
-%__cmake --build "podofo_build" -j$(nproc) --verbose
-mkdir podofo_lib
-DESTDIR=./podofo_lib %__cmake --install podofo_build
-
 # Build library
 %cmake
 %cmake_build
@@ -177,7 +148,7 @@ ln -s ../libcie-pkcs11.so %{buildroot}%{_libdir}/pkcs11/libcie-pkcs11.so
 
 # Install module configuration for p11-kit
 mkdir -p %{buildroot}%{_datadir}/p11-kit/modules
-install -m 0644 %{SOURCE6} %{buildroot}%{_datadir}/p11-kit/modules/libcie-pkcs11.module
+install -m 0644 %{SOURCE5} %{buildroot}%{_datadir}/p11-kit/modules/libcie-pkcs11.module
 
 %files -f .mfiles
 %license LICENSE
