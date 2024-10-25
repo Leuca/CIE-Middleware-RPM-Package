@@ -31,6 +31,7 @@ Patch14:			cie-middleware-reduce-verbosity.patch
 Patch15:			cie-middleware-improve-graphical-signature.patch
 Patch16:			cie-middleware-fix-deallocation-mismatch.patch
 Patch17:			cie-middleware-generate-transparent-signature.patch
+Patch18:			cie-middleware-ignore-unrecognised-tokens.patch
 
 %if 0%{?fedora} < 40 || (0%{?rhel} && 0%{?rhel} < 10)
 BuildRequires:  maven-local-openjdk11

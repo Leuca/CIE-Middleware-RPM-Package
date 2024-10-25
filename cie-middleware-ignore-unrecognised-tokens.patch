@@ -1,0 +1,95 @@
+From 0aa6d8653f60c4ed418f7e20bafbeea778666474 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Fri, 25 Oct 2024 21:20:51 +0200
+Subject: [PATCH] cie-pkcs11: hack: Do not report slots that have a non-CIE
+ token present
+
+Ignore slots with unrecognised tokens since the library can only
+interface with CIE token anyway.
+Don't log errors about unrecognised tokens because are ignored.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/PKCS11/PKCS11Functions.cpp | 17 +++++++++++------
+ cie-pkcs11/PKCS11/Slot.cpp            | 17 +++++++++++++++++
+ cie-pkcs11/PKCS11/Slot.h              |  1 +
+ 3 files changed, 29 insertions(+), 6 deletions(-)
+
+diff --git a/cie-pkcs11/PKCS11/PKCS11Functions.cpp b/cie-pkcs11/PKCS11/PKCS11Functions.cpp
+index 93eef49..aa7d43f 100755
+--- a/cie-pkcs11/PKCS11/PKCS11Functions.cpp
++++ b/cie-pkcs11/PKCS11/PKCS11Functions.cpp
+@@ -276,7 +276,7 @@ CK_RV CK_ENTRY C_GetSlotList(CK_BBOOL tokenPresent, CK_SLOT_ID_PTR pSlotList, CK
+ 			it--;
+ 			std::shared_ptr<CSlot> pSlot=it->second;
+ 
+-			if (pSlot->IsTokenPresent()) {
++			if (pSlot->IsTokenPresent() && pSlot->IsTokenRecognised()) {
+ 				if (pSlotList) {
+ 					if (iCnt<*pulCount)
+ 						pSlotList[iCnt]=pSlot->hSlot;
+@@ -299,11 +299,16 @@ CK_RV CK_ENTRY C_GetSlotList(CK_BBOOL tokenPresent, CK_SLOT_ID_PTR pSlotList, CK
+ 			while (it!=CSlot::g_mSlots.begin())
+ 			{
+ 				it--;
+-				if (iCnt<*pulCount)
+-					pSlotList[iCnt]=it->first;
+-				else
+-					bOver=true;
+-				iCnt++;
++				std::shared_ptr<CSlot> pSlot=it->second;
++
++				if (!pSlot->IsTokenPresent() || pSlot->IsTokenRecognised())
++				{
++					if (iCnt<*pulCount)
++						pSlotList[iCnt]=it->first;
++					else
++						bOver=true;
++					iCnt++;
++				}
+ 			}
+ 		}
+ 	}
+diff --git a/cie-pkcs11/PKCS11/Slot.cpp b/cie-pkcs11/PKCS11/Slot.cpp
+index 107ba8a..339dd7f 100755
+--- a/cie-pkcs11/PKCS11/Slot.cpp
++++ b/cie-pkcs11/PKCS11/Slot.cpp
+@@ -362,6 +362,23 @@ namespace p11 {
+ 		}
+ 	}
+ 
++	bool CSlot::IsTokenRecognised()
++	{
++		init_func
++
++		if (pTemplate == nullptr)
++			pTemplate = CCardTemplate::GetTemplate(*this);
++
++		if (pTemplate == nullptr)
++			return false;
++
++		std::vector<uint8_t> atr_vector(baATR.data(), baATR.data() + baATR.size());
++		if (get_type(atr_vector) == CIE_Type::CIE_Unknown)
++			return false;
++
++		return true;
++	}
++
+ 	void CSlot::GetInfo(CK_SLOT_INFO_PTR pInfo)
+ 	{
+ 		init_func
+diff --git a/cie-pkcs11/PKCS11/Slot.h b/cie-pkcs11/PKCS11/Slot.h
+index 60ec96a..3b279f9 100755
+--- a/cie-pkcs11/PKCS11/Slot.h
++++ b/cie-pkcs11/PKCS11/Slot.h
+@@ -96,6 +96,7 @@ public:
+ 	void DelP11Object(const std::shared_ptr<CP11Object>& pObject);
+ 	void ClearP11Objects();
+ 	bool IsTokenPresent();
++	bool IsTokenRecognised();
+ 
+ 	P11ObjectVector P11Objects; // vettore degli oggetti
+ 
+-- 
+2.43.5
+
