@@ -1,0 +1,58 @@
+From 5a32e804c99655dc0c9a8c303e6597fac7014424 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sat, 26 Oct 2024 19:11:40 +0200
+Subject: [PATCH] CSP: firmaConCIE: make progress bar more uniform
+
+Divide the progress of the progress bar into 4 chunks. Each one
+corresponding to 25% of the total progress.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/CSP/FirmaConCIE.cpp | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/cie-pkcs11/CSP/FirmaConCIE.cpp b/cie-pkcs11/CSP/FirmaConCIE.cpp
+index 9f5bf6b..c044c5f 100644
+--- a/cie-pkcs11/CSP/FirmaConCIE.cpp
++++ b/cie-pkcs11/CSP/FirmaConCIE.cpp
+@@ -71,6 +71,9 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+ 
+         char *curreader = readers;
+         bool foundCIE = false;
++
++        progressCallBack(25, "Looking for CIE...");
++
+         for (; curreader[0] != 0; curreader += strnlen(curreader, len) + 1)
+         {
+             safeConnection conn(hSC, curreader, SCARD_SHARE_SHARED);
+@@ -93,8 +96,6 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+             
+             ByteArray atrBa((BYTE*)ATR, atrLen);
+ 
+-            progressCallBack(20, "Getting certificate from CIE...");
+-
+             IAS* ias = new IAS((CToken::TokenTransmitCallback)TokenTransmitCallback, atrBa);
+             ias->SetCardContext(&conn);
+             
+@@ -130,14 +131,16 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+                 delete ias;
+                 continue;
+             }
+-            
++
++            progressCallBack(50, "Getting certificate from CIE...");
++
+             ByteDynArray FullPIN;
+             ByteArray LastPIN = ByteArray((uint8_t*)pin, strlen(pin));
+             ias->GetFirstPIN(FullPIN);
+             FullPIN.append(LastPIN);
+             ias->token.Reset();
+             
+-            progressCallBack(40, "Starting signature...");
++            progressCallBack(75, "Starting signature...");
+ 
+             char fullPinCStr[9];
+             memcpy(fullPinCStr, FullPIN.data(), 8);
+-- 
+2.43.5
+
