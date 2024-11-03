@@ -1,6 +1,6 @@
-From d4db2332d71aa062f4af0b4fd93704fd6353cef2 Mon Sep 17 00:00:00 2001
+From 126454e24c20050c6ac999181f4636cf8102f8cb Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
-Date: Sun, 3 Nov 2024 14:43:38 +0100
+Date: Sun, 3 Nov 2024 21:37:49 +0100
 Subject: [PATCH] CIEID: hack: make MainFrame window resizable
 
 Implement a method that resizes and repositions components when a window
@@ -11,17 +11,17 @@ tabs UX.
 
 Signed-off-by: Luca Magrone <luca@magrone.cc>
 ---
- CIEID/src/it/ipzs/carousel/carousel.java      |   6 +-
+ CIEID/src/it/ipzs/carousel/carousel.java      |  10 +-
  .../it/ipzs/cieid/Firma/MoveablePicture.java  |  30 +-
  CIEID/src/it/ipzs/cieid/Firma/PdfPreview.java |  25 +-
- CIEID/src/it/ipzs/cieid/IntroFrame.java       |  14 +-
+ CIEID/src/it/ipzs/cieid/IntroFrame.java       |  10 +-
  CIEID/src/it/ipzs/cieid/MainApplication.java  |   8 +
- CIEID/src/it/ipzs/cieid/MainFrame.java        | 302 ++++++++++++++----
+ CIEID/src/it/ipzs/cieid/MainFrame.java        | 314 ++++++++++++++----
  cie_sign_sdk/src/PdfSignatureGenerator.cpp    |   6 +-
- 7 files changed, 310 insertions(+), 81 deletions(-)
+ 7 files changed, 319 insertions(+), 84 deletions(-)
 
 diff --git a/CIEID/src/it/ipzs/carousel/carousel.java b/CIEID/src/it/ipzs/carousel/carousel.java
-index 7c2c07b..14257aa 100644
+index 7c2c07b..34c371e 100644
 --- a/CIEID/src/it/ipzs/carousel/carousel.java
 +++ b/CIEID/src/it/ipzs/carousel/carousel.java
 @@ -20,15 +20,15 @@ import javax.swing.ImageIcon;
@@ -43,6 +43,24 @@ index 7c2c07b..14257aa 100644
  	
  	
  	public carousel()
+@@ -111,7 +111,7 @@ public class carousel extends JPanel {
+ 		btnLeft.setIcon(new ImageIcon(carousel.class.getResource("/it/ipzs/cieid/res/back@2x.png")));
+ 		btnLeft.setForeground(new Color(30, 144, 255));
+ 		btnLeft.setFont(new Font("Dialog", Font.BOLD, 15));
+-		btnLeft.setBounds(-12, 150, 52, 48);
++		btnLeft.setBounds(-3, 150, 52, 48);
+ 		btnLeft.setOpaque(false);
+ 		btnLeft.setBorderPainted(false);
+ 		btnLeft.setContentAreaFilled(false);
+@@ -163,7 +163,7 @@ public class carousel extends JPanel {
+ 		
+ 		radioButtonPanel = new JPanel();
+ 		radioButtonPanel.setBackground(Color.WHITE);
+-		radioButtonPanel.setBounds(38, 258, 491, 25);
++		radioButtonPanel.setBounds(55, 258, 491, 25);
+ 				
+ 		this.add(radioButtonPanel);
+ 	}
 diff --git a/CIEID/src/it/ipzs/cieid/Firma/MoveablePicture.java b/CIEID/src/it/ipzs/cieid/Firma/MoveablePicture.java
 index e05fdcd..f8190a2 100644
 --- a/CIEID/src/it/ipzs/cieid/Firma/MoveablePicture.java
@@ -174,7 +192,7 @@ index bbfd5b4..286b5c9 100644
  		
  		prPanel.removeAll();
 diff --git a/CIEID/src/it/ipzs/cieid/IntroFrame.java b/CIEID/src/it/ipzs/cieid/IntroFrame.java
-index 24149f0..4866ede 100644
+index 24149f0..481396c 100644
 --- a/CIEID/src/it/ipzs/cieid/IntroFrame.java
 +++ b/CIEID/src/it/ipzs/cieid/IntroFrame.java
 @@ -2,6 +2,8 @@ package it.ipzs.cieid;
@@ -186,23 +204,13 @@ index 24149f0..4866ede 100644
  
  import javax.swing.JFrame;
  import javax.swing.JPanel;
-@@ -59,7 +61,7 @@ public class IntroFrame extends JFrame {
- 	public IntroFrame() {
- 		setResizable(false);
- 		setBackground(Color.WHITE);
--		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-+		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
- 		setBounds(100, 100, 800, 600);
- 		contentPane = new JPanel();
- 		contentPane.setBackground(Color.WHITE);
 @@ -152,8 +154,14 @@ public class IntroFrame extends JFrame {
  					Utils.setProperty("nomore", "true");
  				
  				// TODO open main frame
 -				JFrame frame = new MainFrame(new String[] { });			
--				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 +				JFrame frame = new MainFrame(new String[] { });
-+				frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+ 				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 +				frame.addWindowListener(new WindowAdapter() {
 +					@Override
 +					public void windowClosed(WindowEvent e) {
@@ -239,7 +247,7 @@ index 58b077b..19faa03 100644
  
  	private static void notifyPinWrong()
 diff --git a/CIEID/src/it/ipzs/cieid/MainFrame.java b/CIEID/src/it/ipzs/cieid/MainFrame.java
-index c6204aa..f1ea5ef 100644
+index fbd9aa0..92597e0 100644
 --- a/CIEID/src/it/ipzs/cieid/MainFrame.java
 +++ b/CIEID/src/it/ipzs/cieid/MainFrame.java
 @@ -2,6 +2,7 @@ package it.ipzs.cieid;
@@ -250,16 +258,16 @@ index c6204aa..f1ea5ef 100644
  import java.awt.EventQueue;
  import java.awt.Font;
  import java.awt.FontFormatException;
-@@ -11,6 +12,8 @@ import java.awt.GraphicsEnvironment;
- import java.awt.SystemColor;
- import java.awt.event.ActionEvent;
+@@ -13,6 +14,8 @@ import java.awt.event.ActionEvent;
  import java.awt.event.ActionListener;
+ import java.awt.event.ItemEvent;
+ import java.awt.event.ItemListener;
 +import java.awt.event.ComponentAdapter;
 +import java.awt.event.ComponentEvent;
  import java.awt.event.KeyAdapter;
  import java.awt.event.KeyEvent;
  import java.io.File;
-@@ -170,6 +173,7 @@ public class MainFrame extends JFrame {
+@@ -179,6 +182,7 @@ public class MainFrame extends JFrame {
      private JLabel lblChangePINText;
      private JTextPane txtpnThePINOfYourCIE;
      private JLabel label_6;
@@ -267,7 +275,7 @@ index c6204aa..f1ea5ef 100644
      private JCheckBox checkBox_3;
      private JLabel labelProgressChangePIN;
      private JProgressBar progressBarChangePIN;
-@@ -186,7 +190,7 @@ public class MainFrame extends JFrame {
+@@ -195,7 +199,7 @@ public class MainFrame extends JFrame {
      private JTextPane textPane_2;
      private JPasswordField puk01;
      private JPanel panel_7;
@@ -276,7 +284,7 @@ index c6204aa..f1ea5ef 100644
      private JTextPane txtpnTypeThePUKOfYourCIE;
      private JLabel label_8;
      private JCheckBox checkBox_5;
-@@ -394,10 +398,10 @@ public class MainFrame extends JFrame {
+@@ -410,10 +414,10 @@ public class MainFrame extends JFrame {
          loadLogConfigFromFile();
          logger.Info("Inizializza frame principale");
          signOperation = SignOp.OP_NONE;
@@ -288,7 +296,7 @@ index c6204aa..f1ea5ef 100644
          contentPane = new JPanel();
          contentPane.setBackground(Color.WHITE);
          contentPane.setBorder(new EmptyBorder(0, 0, 0, 0));
-@@ -629,8 +633,8 @@ public class MainFrame extends JFrame {
+@@ -648,8 +652,8 @@ public class MainFrame extends JFrame {
          btnSettings.setBackground(SystemColor.window);
          btnSettings.setBounds(0, 490, 200, 45);
          leftPanel.add(btnSettings);
@@ -299,7 +307,7 @@ index c6204aa..f1ea5ef 100644
          tabbedPane.addChangeListener(new ChangeListener() {
              @Override
              public void stateChanged(ChangeEvent e) {
-@@ -821,7 +825,7 @@ public class MainFrame extends JFrame {
+@@ -840,7 +844,7 @@ public class MainFrame extends JFrame {
          buttonsPanel.setBackground(new Color(255, 255, 255));
          FlowLayout flowLayout = (FlowLayout) buttonsPanel.getLayout();
          flowLayout.setHgap(100);
@@ -308,7 +316,7 @@ index c6204aa..f1ea5ef 100644
          btnCancel = new JButton("Annulla");
          btnCancel.addActionListener(new ActionListener() {
              public void actionPerformed(ActionEvent e) {
-@@ -889,7 +893,7 @@ public class MainFrame extends JFrame {
+@@ -908,7 +912,7 @@ public class MainFrame extends JFrame {
          cieCarousel.setLocation(0, 170);
          pnCIEHomeSelector_Index_3.add(cieCarousel);
          btnPanel = new JPanel();
@@ -317,7 +325,16 @@ index c6204aa..f1ea5ef 100644
          btnPanel.setBackground(Color.WHITE);
          btnRemoveAll = new JButton("Rimuovi tutte");
          btnRemoveAll.addActionListener(new ActionListener() {
-@@ -1024,7 +1028,7 @@ public class MainFrame extends JFrame {
+@@ -1008,7 +1012,7 @@ public class MainFrame extends JFrame {
+         txtpnCIEPanelsSubtitle.setEditable(false);
+         txtpnCIEPanelsSubtitle.setFont(new Font("Dialog", Font.PLAIN, 16));
+         txtpnCIEPanelsSubtitle.setText("Carta di Identità Elettronica abbinata correttamente");
+-        txtpnCIEPanelsSubtitle.setBounds(63, 84, 492, 46);
++        txtpnCIEPanelsSubtitle.setBounds(50, 84, 492, 46);
+         pnCIEHomeSelector_Index_3.add(txtpnCIEPanelsSubtitle);
+         pnChangePINTypingScreen_Index_4 = new JPanel();
+         pnChangePINTypingScreen_Index_4.setLayout(null);
+@@ -1043,7 +1047,7 @@ public class MainFrame extends JFrame {
          });
          btnPerformChangePIN.setForeground(Color.WHITE);
          btnPerformChangePIN.setBackground(new Color(30, 144, 255));
@@ -326,7 +343,7 @@ index c6204aa..f1ea5ef 100644
          pnChangePINTypingScreen_Index_4.add(btnPerformChangePIN);
          lblTypeTheOldValue = new JLabel("Inserisci il vecchio PIN");
          lblTypeTheOldValue.setHorizontalAlignment(SwingConstants.LEFT);
-@@ -1116,11 +1120,11 @@ public class MainFrame extends JFrame {
+@@ -1135,11 +1139,11 @@ public class MainFrame extends JFrame {
          panel_6.setLayout(null);
          panel_6.setBackground(Color.WHITE);
          tabbedPane.addTab("New tab", null, panel_6, null);
@@ -343,7 +360,7 @@ index c6204aa..f1ea5ef 100644
          txtpnUseYourPUK = new JTextPane();
          txtpnUseYourPUK.setText("Utilizza il codice PUK ricevuto con la CIE");
          txtpnUseYourPUK.setFont(new Font("Dialog", Font.PLAIN, 16));
-@@ -1144,7 +1148,7 @@ public class MainFrame extends JFrame {
+@@ -1163,7 +1167,7 @@ public class MainFrame extends JFrame {
          });
          btnUnlockPIN.setForeground(Color.WHITE);
          btnUnlockPIN.setBackground(new Color(30, 144, 255));
@@ -352,7 +369,7 @@ index c6204aa..f1ea5ef 100644
          panel_6.add(btnUnlockPIN);
          lblInsertYourPUK = new JLabel("Inserisci il PUK");
          lblInsertYourPUK.setHorizontalAlignment(SwingConstants.LEFT);
-@@ -1204,11 +1208,11 @@ public class MainFrame extends JFrame {
+@@ -1223,11 +1227,11 @@ public class MainFrame extends JFrame {
          panel_7.setLayout(null);
          panel_7.setBackground(Color.WHITE);
          tabbedPane.addTab("New tab", null, panel_7, null);
@@ -369,34 +386,52 @@ index c6204aa..f1ea5ef 100644
          txtpnTypeThePUKOfYourCIE = new JTextPane();
          txtpnTypeThePUKOfYourCIE.setText("Utilizza il codice PUK ricevuto con la CIE");
          txtpnTypeThePUKOfYourCIE.setFont(new Font("Dialog", Font.PLAIN, 16));
-@@ -1242,7 +1246,7 @@ public class MainFrame extends JFrame {
+@@ -1261,7 +1265,7 @@ public class MainFrame extends JFrame {
          lblHelp.setBounds(147, 36, 299, 36);
          panel_8.add(lblHelp);
          MiniWebView webView = new MiniWebView();
 -        webView.setBounds(12, 99, 571, 362);
-+        webView.setBounds(12, 99, 571, 438);
++        webView.setBounds(12, 99, 574, 438);
          panel_8.add(webView);
          webView.showPage(MainFrame.class.getResource("/it/ipzs/cieid/res/tutorial_linux.html"));
          panel_9 = new JPanel();
-@@ -1255,7 +1259,7 @@ public class MainFrame extends JFrame {
+@@ -1274,7 +1278,7 @@ public class MainFrame extends JFrame {
          label_11.setBounds(147, 36, 299, 36);
          panel_9.add(label_11);
          miniWebView = new MiniWebView();
 -        miniWebView.setBounds(12, 99, 571, 362);
-+        miniWebView.setBounds(12, 99, 571, 438);
++        miniWebView.setBounds(12, 99, 574, 438);
          panel_9.add(miniWebView);
          miniWebView.showPage("https://idserver.servizicie.interno.gov.it/idp/aiuto.jsp");
          panel_10 = new JPanel();
-@@ -1268,7 +1272,7 @@ public class MainFrame extends JFrame {
+@@ -1287,7 +1291,7 @@ public class MainFrame extends JFrame {
          lblInformation.setBounds(147, 36, 299, 36);
          panel_10.add(lblInformation);
          miniWebView_1 = new MiniWebView();
 -        miniWebView_1.setBounds(12, 99, 571, 362);
-+        miniWebView_1.setBounds(12, 99, 571, 438);
++        miniWebView_1.setBounds(12, 99, 574, 438);
          panel_10.add(miniWebView_1);
          miniWebView_1.showPage("https://idserver.servizicie.interno.gov.it/idp/privacy.jsp");
          StyledDocument doc = textPane_1.getStyledDocument();
-@@ -1398,7 +1402,7 @@ public class MainFrame extends JFrame {
+@@ -1314,7 +1318,7 @@ public class MainFrame extends JFrame {
+         lblDigitalSignature = new JLabel("Firma Elettronica");
+         lblDigitalSignature.setHorizontalAlignment(SwingConstants.CENTER);
+         lblDigitalSignature.setFont(new Font("Dialog", Font.BOLD, 30));
+-        lblDigitalSignature.setBounds(165, 45, 302, 39);
++        lblDigitalSignature.setBounds(147, 45, 302, 39);
+         selectFile.add(lblDigitalSignature);
+         panel_24 = new JPanel();
+         panel_24.setBackground(SystemColor.text);
+@@ -1323,7 +1327,7 @@ public class MainFrame extends JFrame {
+         panel_24.setLayout(null);
+         panelLoadFile = new JPanel();
+         panelLoadFile.setBackground(SystemColor.text);
+-        panelLoadFile.setBounds(12, 12, 513, 300);
++        panelLoadFile.setBounds(12, 12, 516, 300);
+         panel_24.add(panelLoadFile);
+         panelLoadFile.setLayout(null);
+         panelLoadFile.setBorder(BorderFactory.createDashedBorder(null, 5, 5));
+@@ -1417,7 +1421,7 @@ public class MainFrame extends JFrame {
  
                      signImage = ImageIO.read(new File(signImagePath));
                      ImageIcon imageIcon = new ImageIcon();
@@ -405,7 +440,7 @@ index c6204aa..f1ea5ef 100644
                      lblCustomizedGraphicSignature.setIcon(imageIcon);
                      tabbedPane.setSelectedIndex(15);
  
-@@ -1444,7 +1448,7 @@ public class MainFrame extends JFrame {
+@@ -1463,7 +1467,7 @@ public class MainFrame extends JFrame {
          selectOperation.add(lblFirmaElettronica_1);
          panel_16 = new JPanel();
          panel_16.setBackground(SystemColor.text);
@@ -414,7 +449,7 @@ index c6204aa..f1ea5ef 100644
          selectOperation.add(panel_16);
          panel_16.setLayout(null);
          panel = new JPanel();
-@@ -1617,8 +1621,8 @@ public class MainFrame extends JFrame {
+@@ -1636,8 +1640,8 @@ public class MainFrame extends JFrame {
                  tabbedPane.setSelectedIndex(10);
              }
          });
@@ -425,7 +460,7 @@ index c6204aa..f1ea5ef 100644
          btnCancelOp.setForeground(Color.WHITE);
          btnCancelOp.setBackground(new Color(30, 144, 255));
          selectSignatureOperation = new JPanel();
-@@ -1632,7 +1636,7 @@ public class MainFrame extends JFrame {
+@@ -1651,7 +1655,7 @@ public class MainFrame extends JFrame {
          selectSignatureOperation.add(lblFirmaElettronica_2);
          panel_23 = new JPanel();
          panel_23.setBackground(SystemColor.text);
@@ -434,7 +469,7 @@ index c6204aa..f1ea5ef 100644
          selectSignatureOperation.add(panel_23);
          panel_23.setLayout(null);
          panel_15 = new JPanel();
-@@ -1656,7 +1660,7 @@ public class MainFrame extends JFrame {
+@@ -1675,7 +1679,7 @@ public class MainFrame extends JFrame {
          panel_15.add(lblPathSignOp);
          panel_20 = new JPanel();
          panel_20.setBackground(SystemColor.text);
@@ -443,7 +478,7 @@ index c6204aa..f1ea5ef 100644
          panel_23.add(panel_20);
          panel_20.setLayout(null);
          JLabel lblNewLabel_8_1 = new JLabel("Seleziona il tipo di firma");
-@@ -1765,8 +1769,8 @@ public class MainFrame extends JFrame {
+@@ -1784,8 +1788,8 @@ public class MainFrame extends JFrame {
          panel_19.add(cbGraphicSig);
          JPanel panel_17 = new JPanel();
          panel_17.setBackground(SystemColor.text);
@@ -454,7 +489,7 @@ index c6204aa..f1ea5ef 100644
          panel_17.setLayout(null);
          JButton btnAnnullaOp_1 = new JButton("Annulla");
          btnAnnullaOp_1.addActionListener(new ActionListener() {
-@@ -1861,7 +1865,7 @@ public class MainFrame extends JFrame {
+@@ -1880,7 +1884,7 @@ public class MainFrame extends JFrame {
          pdfPreview.add(lblFirmaElettronica_3);
          panel_25 = new JPanel();
          panel_25.setBackground(SystemColor.text);
@@ -463,7 +498,7 @@ index c6204aa..f1ea5ef 100644
          pdfPreview.add(panel_25);
          panel_25.setLayout(null);
          panel_21 = new JPanel();
-@@ -1898,14 +1902,14 @@ public class MainFrame extends JFrame {
+@@ -1917,14 +1921,14 @@ public class MainFrame extends JFrame {
                  lblPathPin.setText(filePath);
              }
          });
@@ -481,7 +516,7 @@ index c6204aa..f1ea5ef 100644
          panel_25.add(panelPdfPreview);
          GridBagLayout gbl_panelPdfPreview = new GridBagLayout();
          gbl_panelPdfPreview.columnWidths = new int[] {0};
-@@ -1915,7 +1919,7 @@ public class MainFrame extends JFrame {
+@@ -1934,7 +1938,7 @@ public class MainFrame extends JFrame {
          panelPdfPreview.setLayout(gbl_panelPdfPreview);
          panel_22 = new JPanel();
          panel_22.setBackground(SystemColor.text);
@@ -490,7 +525,7 @@ index c6204aa..f1ea5ef 100644
          panel_25.add(panel_22);
          panel_22.setLayout(null);
          btnUp = new JButton("");
-@@ -1962,7 +1966,7 @@ public class MainFrame extends JFrame {
+@@ -1981,7 +1985,7 @@ public class MainFrame extends JFrame {
          panel_26 = new JPanel();
          panel_26.setLayout(null);
          panel_26.setBackground(Color.WHITE);
@@ -499,7 +534,7 @@ index c6204aa..f1ea5ef 100644
          firmaPin.add(panel_26);
          panel_27 = new JPanel();
          panel_27.setLayout(null);
-@@ -1985,8 +1989,8 @@ public class MainFrame extends JFrame {
+@@ -2004,8 +2008,8 @@ public class MainFrame extends JFrame {
          panel_27.add(lblPathPin);
          panel_28 = new JPanel();
          panel_28.setBackground(SystemColor.text);
@@ -510,7 +545,7 @@ index c6204aa..f1ea5ef 100644
          panel_28.setLayout(null);
          btnUndoPINTyping = new JButton("Annulla");
          btnUndoPINTyping.addMouseListener(new MouseAdapter() {
-@@ -2271,13 +2275,13 @@ public class MainFrame extends JFrame {
+@@ -2290,13 +2294,13 @@ public class MainFrame extends JFrame {
          customizeGraphicSignature.add(lblFirmaElettronica_5);
          JPanel panel_30 = new JPanel();
          panel_30.setBackground(Color.WHITE);
@@ -527,7 +562,7 @@ index c6204aa..f1ea5ef 100644
          panel_31.setLayout(null);
          JButton btnSelectImg = new JButton("Seleziona un file");
          btnSelectImg.addActionListener(new ActionListener() {
-@@ -2298,7 +2302,7 @@ public class MainFrame extends JFrame {
+@@ -2317,7 +2321,7 @@ public class MainFrame extends JFrame {
                          FileUtils.copyFile(new File(source), new File(dest));
                          Image signImage = ImageIO.read(new File(dest));
                          ImageIcon imageIcon = new ImageIcon();
@@ -536,7 +571,7 @@ index c6204aa..f1ea5ef 100644
                          lblCustomizedGraphicSignature.setIcon(imageIcon);
                          lblCustomize.setText("Aggiorna");
                          lblHint.setText("Una tua firma personalizzata è già stata caricata. Vuoi aggiornarla?");
-@@ -2350,7 +2354,7 @@ public class MainFrame extends JFrame {
+@@ -2369,7 +2373,7 @@ public class MainFrame extends JFrame {
  
                      signImage = ImageIO.read(new File(signImagePath));
                      ImageIcon imageIcon = new ImageIcon();
@@ -545,7 +580,7 @@ index c6204aa..f1ea5ef 100644
                      lblCustomizedGraphicSignature.setIcon(imageIcon);
                      selectedCie.getCard().setIsCustomSign(false);
                      cieDictionary.put(selectedCie.getCard().getPan(), selectedCie.getCard());
-@@ -2376,7 +2380,7 @@ public class MainFrame extends JFrame {
+@@ -2395,7 +2399,7 @@ public class MainFrame extends JFrame {
          panel_31.add(btnGenerateGraphicSignature);
          lblHint = new JTextArea();
          lblHint.setHighlighter(null);
@@ -554,7 +589,7 @@ index c6204aa..f1ea5ef 100644
          panel_30.add(lblHint);
          lblHint.setWrapStyleWord(true);
          lblHint.setText("Abbiamo creato per te una firma grafica, ma se preferisci puoi personalizzarla. Questo passaggio non \u00E8 indispensabile, ma ti consentir\u00E0 di dare un tocco personale ai documenti firmati.");
-@@ -2387,17 +2391,17 @@ public class MainFrame extends JFrame {
+@@ -2406,17 +2410,17 @@ public class MainFrame extends JFrame {
          lblHint.setBackground(Color.WHITE);
          JTextArea txtrAbbiamoCreatoPer_1_1 = new JTextArea();
          txtrAbbiamoCreatoPer_1_1.setHighlighter(null);
@@ -575,7 +610,7 @@ index c6204aa..f1ea5ef 100644
          panel_30.add(lblCustomizedGraphicSignature);
          pnVerify = new JPanel();
          pnVerify.setLayout(null);
-@@ -2410,13 +2414,14 @@ public class MainFrame extends JFrame {
+@@ -2429,13 +2433,14 @@ public class MainFrame extends JFrame {
          pnVerify.add(lblFirmaElettronica_6);
          panel_32 = new JPanel();
          panel_32.setBackground(Color.WHITE);
@@ -592,7 +627,7 @@ index c6204aa..f1ea5ef 100644
          panel_32.add(verifyScrollPane);
          JPanel panel_27_1 = new JPanel();
          panel_27_1.setBounds(0, 0, 449, 82);
-@@ -2446,8 +2451,8 @@ public class MainFrame extends JFrame {
+@@ -2465,8 +2470,8 @@ public class MainFrame extends JFrame {
          });
          btnConcludiVerifica.setForeground(Color.WHITE);
          btnConcludiVerifica.setBackground(new Color(30, 144, 255));
@@ -603,7 +638,7 @@ index c6204aa..f1ea5ef 100644
          btnExtractP7M = new JButton("Estrai");
          btnExtractP7M.addActionListener(new ActionListener() {
              public void actionPerformed(ActionEvent arg0) {
-@@ -2496,8 +2501,8 @@ public class MainFrame extends JFrame {
+@@ -2515,8 +2520,8 @@ public class MainFrame extends JFrame {
          });
          btnExtractP7M.setForeground(Color.WHITE);
          btnExtractP7M.setBackground(new Color(30, 144, 255));
@@ -614,25 +649,25 @@ index c6204aa..f1ea5ef 100644
          JLabel lblNewLabel_13 = new JLabel("Verifica firma elettronica");
          lblNewLabel_13.setFont(new Font("Dialog", Font.BOLD, 17));
          lblNewLabel_13.setBounds(190, 82, 246, 15);
-@@ -2508,7 +2513,7 @@ public class MainFrame extends JFrame {
+@@ -2527,7 +2532,7 @@ public class MainFrame extends JFrame {
          pnSettings.setLayout(null);
          JTabbedPane configTabbedPane = new JTabbedPane(JTabbedPane.TOP);
          configTabbedPane.setBackground(Color.WHITE);
 -        configTabbedPane.setBounds(12, 12, 571, 500);
-+        configTabbedPane.setBounds(12, 12, 571, 475);
++        configTabbedPane.setBounds(12, 12, 574, 500);
          pnSettings.add(configTabbedPane);
          JPanel configProxyPanel = new JPanel();
          configProxyPanel.setBackground(Color.WHITE);
-@@ -2675,7 +2680,7 @@ public class MainFrame extends JFrame {
-         panelConfigLoggingLib.add(verticalGlue_4);
-         configButtonsPanel = new JPanel();
-         configButtonsPanel.setBackground(Color.WHITE);
--        configButtonsPanel.setBounds(0, 524, 595, 47);
-+        configButtonsPanel.setBounds(0, 507, 595, 47);
-         pnSettings.add(configButtonsPanel);
-         btnSave = new JButton("Salva");
-         btnSave.addActionListener(new ActionListener() {
-@@ -2758,7 +2763,194 @@ public class MainFrame extends JFrame {
+@@ -2616,7 +2621,7 @@ public class MainFrame extends JFrame {
+         lblConfigLoggingCaption.setFont(new Font("Dialog", Font.BOLD, 15));
+         configLoggingPanel.add(lblConfigLoggingCaption);
+         JPanel configLoggingBodyPanel = new JPanel();
+-        configLoggingBodyPanel.setBounds(37, 109, 500, 331);
++        configLoggingBodyPanel.setBounds(37, 89, 500, 331);
+         configLoggingBodyPanel.setLayout(null);
+         configLoggingBodyPanel.setBackground(Color.WHITE);
+         configLoggingPanel.add(configLoggingBodyPanel);
+@@ -2828,7 +2833,200 @@ public class MainFrame extends JFrame {
          } else {
              selectHome();
          }
@@ -640,7 +675,7 @@ index c6204aa..f1ea5ef 100644
 +
 +        class ComponentResizer {
 +            public void resizeComponents() {
-+                int width = getWidth() + 3;
++                int width = getWidth();
 +                int height = getHeight();
 +
 +                // Helper class to calculate the correct centerd position
@@ -686,12 +721,12 @@ index c6204aa..f1ea5ef 100644
 +                cieCarousel.cieRight.setLocation(r.x(408), cieCarousel.cieRight.getY());
 +                cieCarousel.cieCenter.setLocation(r.x(190), cieCarousel.cieCenter.getY());
 +                cieCarousel.cieLeft.setLocation(r.x(38), cieCarousel.cieLeft.getY());
-+                cieCarousel.radioButtonPanel.setLocation(r.x(38), cieCarousel.radioButtonPanel.getY());
++                cieCarousel.radioButtonPanel.setLocation(r.x(55), cieCarousel.radioButtonPanel.getY());
 +                cieCarousel.setSize(width - 205, height / 2);
 +                cieCarousel.btnRight.setLocation(width - 252, cieCarousel.btnRight.getY());
 +                btnPanel.setBounds(btnPanel.getX(), height - 93, width - 205, btnPanel.getHeight());
 +                lblCieId.setLocation(r.x(147), lblCieId.getY());
-+                txtpnCIEPanelsSubtitle.setLocation(r.x(63), txtpnCIEPanelsSubtitle.getY());
++                txtpnCIEPanelsSubtitle.setLocation(r.x(50), txtpnCIEPanelsSubtitle.getY());
 +                /* 2 */
 +                lblChangePIN.setLocation(r.x(147), lblChangePIN.getY());
 +                txtpnThePINOfYourCard.setLocation(r.x(147), txtpnThePINOfYourCard.getY());
@@ -733,15 +768,15 @@ index c6204aa..f1ea5ef 100644
 +                labelProgressUnlock.setLocation(r.x(252), r.y(259));
 +                progressBarUnlock.setLocation(r.x(258), r.y(324));
 +                lblHelp.setLocation(r.x(147), lblHelp.getY());
-+                webView.setSize(width - 229, height - 162);
++                webView.setSize(width - 226, height - 162);
 +                label_11.setLocation(r.x(147), label_11.getY());
-+                miniWebView.setSize(width - 229, height - 162);
++                miniWebView.setSize(width - 226, height - 162);
 +                lblInformation.setLocation(r.x(147), lblInformation.getY());
-+                miniWebView_1.setSize(width - 229, height - 162);
++                miniWebView_1.setSize(width - 226, height - 162);
 +                /* 6,7,8,9 */
-+                lblDigitalSignature.setLocation(r.x(165), lblDigitalSignature.getY());
++                lblDigitalSignature.setLocation(r.x(147), lblDigitalSignature.getY());
 +                panel_24.setSize(width - 260, height - 199);
-+                panelLoadFile.setSize(width - 287, height - 300);
++                panelLoadFile.setSize(width - 284, height - 300);
 +                lblNewLabel.setLocation(r.x(223), r.y(12));
 +                txtrDragAndDropDocuments.setLocation(r.x(70), r.y(141));
 +                txtrOtherwise.setLocation(r.x(239), r.y(212));
@@ -805,14 +840,20 @@ index c6204aa..f1ea5ef 100644
 +                btnExtractP7M.setLocation(r.x(133), height - 93);
 +                lblNewLabel_13.setLocation(r.x(190), lblNewLabel_13.getY());
 +                /* 16 */
-+                configTabbedPane.setSize(width - 229, height - 125);
++                configTabbedPane.setSize(width - 226, height - 100);
 +                lblConfigProxyTitle.setLocation(r.x(67), lblConfigProxyTitle.getY());
 +                lblConfigProxyCaption.setLocation(r.x(53), lblConfigProxyCaption.getY());
-+                configProxyBodyPanel.setLocation(r.x(37), r.y(109));
++                configProxyBodyPanel.setLocation(r.x(37), configProxyBodyPanel.getY());
 +                lblConfigLoggingTitle.setLocation(r.x(73), lblConfigLoggingTitle.getY());
 +                lblConfigLoggingCaption.setLocation(r.x(69), lblConfigLoggingCaption.getY());
-+                configLoggingBodyPanel.setLocation(r.x(37), r.y(109));
-+                configButtonsPanel.setLocation(r.x(0), height - 93);
++                configLoggingBodyPanel.setLocation(r.x(37), configLoggingBodyPanel.getY());
++                configButtonsPanel.setLocation(r.x(0), height - 76);
++                lblConfigPreferencesTitle.setLocation(r.x(72), lblConfigPreferencesTitle.getY());
++                lblConfigPreferencesCaption.setLocation(r.x(40), lblConfigPreferencesCaption.getY());
++                lblConfigPreferencesCaption_1.setLocation(r.x(45), lblConfigPreferencesCaption_1.getY());
++                cboxShowTutorial.setLocation(r.x(94), cboxShowTutorial.getY());
++                btnDeleteLogs.setLocation(r.x(292), btnDeleteLogs.getY());
++                btnCollectLogs.setLocation(r.x(47), btnCollectLogs.getY());
 +                /* 17 */
 +            }
 +        }
@@ -827,7 +868,7 @@ index c6204aa..f1ea5ef 100644
 +
          System.out.println("tabbedPanel: " + tabbedPane);
      }
- 
+     
 diff --git a/cie_sign_sdk/src/PdfSignatureGenerator.cpp b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
 index fa5e038..48714ec 100644
 --- a/cie_sign_sdk/src/PdfSignatureGenerator.cpp

@@ -1,4 +1,4 @@
-From af0de22d6509eba48d9daad5b6c2b30f548f96b0 Mon Sep 17 00:00:00 2001
+From 1cb9663b36b76a1c6859d06939eaae5f4bfe0eb0 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
 Date: Sun, 3 Nov 2024 15:22:11 +0100
 Subject: [PATCH] CIEID: Set JFrame icon and Title
@@ -10,7 +10,7 @@ Signed-off-by: Luca Magrone <luca@magrone.cc>
  2 files changed, 21 insertions(+)
 
 diff --git a/CIEID/src/it/ipzs/cieid/IntroFrame.java b/CIEID/src/it/ipzs/cieid/IntroFrame.java
-index 4866ede..6b64425 100644
+index 481396c..b2f1bd1 100644
 --- a/CIEID/src/it/ipzs/cieid/IntroFrame.java
 +++ b/CIEID/src/it/ipzs/cieid/IntroFrame.java
 @@ -2,6 +2,7 @@ package it.ipzs.cieid;
@@ -37,12 +37,12 @@ index 4866ede..6b64425 100644
 +		setTitle("Benvenuto in CIE ID");
  		setResizable(false);
  		setBackground(Color.WHITE);
- 		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+ 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 diff --git a/CIEID/src/it/ipzs/cieid/MainFrame.java b/CIEID/src/it/ipzs/cieid/MainFrame.java
-index f1ea5ef..d764f36 100644
+index 92597e0..5d0d6f8 100644
 --- a/CIEID/src/it/ipzs/cieid/MainFrame.java
 +++ b/CIEID/src/it/ipzs/cieid/MainFrame.java
-@@ -413,6 +413,16 @@ public class MainFrame extends JFrame {
+@@ -429,6 +429,16 @@ public class MainFrame extends JFrame {
          contentPane.add(leftPanel);
          leftPanel.setLayout(null);
          JLabel label_2 = new JLabel("");
