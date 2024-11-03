@@ -1,7 +1,7 @@
-From 5a32e804c99655dc0c9a8c303e6597fac7014424 Mon Sep 17 00:00:00 2001
+From f49a29963144307fa72f3f3f2e4cf05c98e0b429 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
-Date: Sat, 26 Oct 2024 19:11:40 +0200
-Subject: [PATCH] CSP: firmaConCIE: make progress bar more uniform
+Date: Sat, 26 Oct 2024 19:16:20 +0200
+Subject: [PATCH] CSP: firmaConCIE: make progress more uniform
 
 Divide the progress of the progress bar into 4 chunks. Each one
 corresponding to 25% of the total progress.
@@ -12,7 +12,7 @@ Signed-off-by: Luca Magrone <luca@magrone.cc>
  1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/cie-pkcs11/CSP/FirmaConCIE.cpp b/cie-pkcs11/CSP/FirmaConCIE.cpp
-index 9f5bf6b..c044c5f 100644
+index 9e3b961..15b5257 100644
 --- a/cie-pkcs11/CSP/FirmaConCIE.cpp
 +++ b/cie-pkcs11/CSP/FirmaConCIE.cpp
 @@ -71,6 +71,9 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
@@ -34,7 +34,7 @@ index 9f5bf6b..c044c5f 100644
              IAS* ias = new IAS((CToken::TokenTransmitCallback)TokenTransmitCallback, atrBa);
              ias->SetCardContext(&conn);
              
-@@ -130,14 +131,16 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+@@ -134,14 +135,16 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
                  delete ias;
                  continue;
              }

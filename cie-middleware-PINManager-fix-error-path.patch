@@ -1,0 +1,81 @@
+From eeab052be40b9dbb90b260bf3b1efb955615333a Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Fri, 1 Nov 2024 14:32:07 +0100
+Subject: [PATCH] cie-pkcs11: CSP: PINManager: fix error path
+
+Currently the code tries to perform operations on the PIN of every
+available token. This leads to error thrown at the user if multiple
+token are present in the system.
+
+Skip unrecognised tokens and stop at the first succesfult PIN operation.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/CSP/PINManager.cpp | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/cie-pkcs11/CSP/PINManager.cpp b/cie-pkcs11/CSP/PINManager.cpp
+index 8bc2ce0..4c3fbf7 100644
+--- a/cie-pkcs11/CSP/PINManager.cpp
++++ b/cie-pkcs11/CSP/PINManager.cpp
+@@ -118,7 +118,17 @@ CK_RV CK_ENTRY CambioPIN(const char*  szCurrentPIN, const char*  szNewPIN, int*
+             ias.attemptsRemaining = -1;
+             
+             ias.token.Reset();
+-            ias.SelectAID_IAS();
++            // Continue looking for CIE if the token is unrecognised
++            try
++            {
++                ias.SelectAID_IAS();
++            }
++            catch(logged_error &err)
++            {
++                free(ATR);
++                ATR = NULL;
++                continue;
++            }
+             ias.ReadPAN();
+             
+             progressCallBack(20, "Lettura dati dalla CIE");
+@@ -204,6 +214,9 @@ CK_RV CK_ENTRY CambioPIN(const char*  szCurrentPIN, const char*  szNewPIN, int*
+             
+             progressCallBack(100, "Cambio PIN eseguito");
+             LOG_INFO("******** PINManager::ChangePIN Completed ********");
++
++            // A this point a CIE has been found, stop looking for it
++            break;
+         }
+         
+         if (!foundCIE) {
+@@ -308,7 +321,17 @@ CK_RV CK_ENTRY SbloccoPIN(const char*  szPUK, const char*  szNewPIN, int* pAttem
+             ias.attemptsRemaining = -1;
+             
+             ias.token.Reset();
+-            ias.SelectAID_IAS();
++            // Continue looking for CIE if the token is unrecognised
++            try
++            {
++                ias.SelectAID_IAS();
++            }
++            catch(logged_error &err)
++            {
++                free(ATR);
++                ATR = NULL;
++                continue;
++            }
+             ias.ReadPAN();
+             
+             progressCallBack(30, "Lettura dati dalla CIE");
+@@ -394,6 +417,9 @@ CK_RV CK_ENTRY SbloccoPIN(const char*  szPUK, const char*  szNewPIN, int* pAttem
+             
+             progressCallBack(100, "Sblocco carta eseguito");
+             LOG_INFO("******** PINManager::UnlockPIN Completed ********");
++
++            // A this point a CIE has been found, stop looking for it
++            break;
+         }
+         
+         if (!foundCIE) {
+-- 
+2.43.5
+

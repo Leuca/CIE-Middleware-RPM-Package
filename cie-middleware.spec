@@ -9,10 +9,9 @@ ExclusiveArch:	%{java_arches}
 
 Source0:		https://github.com/italia/cie-middleware-linux/archive/%{version}/%{name}-linux-%{version}.tar.gz
 Source1:		CMakeLists.txt
-Source2:		logo.png
-Source3:		cieid.desktop
-Source4:		pom.xml
-Source5:		libcie-pkcs11.module
+Source2:		cieid.desktop
+Source3:		pom.xml
+Source4:		libcie-pkcs11.module
 
 Patch1:			cie-middleware-common-fixup.patch
 Patch2:			cie-middleware-cie-pkcs11-fixup.patch
@@ -32,8 +31,12 @@ Patch15:			cie-middleware-improve-graphical-signature.patch
 Patch16:			cie-middleware-fix-deallocation-mismatch.patch
 Patch17:			cie-middleware-generate-transparent-signature.patch
 Patch18:			cie-middleware-ignore-unrecognised-tokens.patch
-Patch19:			cie-middleware-fix-FirmaConCIE-error-on-multiple-tokens.patch
+Patch19:			cie-middleware-FirmaConCIE-fix-error-path.patch
 Patch20:			cie-middleware-FirmaConCIE-make-progress-more-uniform.patch
+Patch21:			cie-middleware-cieid-make-window-resizable.patch
+Patch22:			cie-middleware-PINManager-fix-error-path.patch
+Patch23:			cie-middleware-AbilitaCIE-fix-error-path.patch
+Patch24:			cie-middleware-cieid-jframe-set-icon-and-title.patch
 
 %if 0%{?fedora} < 40 || (0%{?rhel} && 0%{?rhel} < 10)
 BuildRequires:  maven-local-openjdk11
@@ -110,7 +113,7 @@ sed -i '0,/cryptopp/s/cryptopp/libcryptopp/' CMakeLists.txt
 %endif
 
 # Install CIEID pom.xml file
-install %{SOURCE4} pom.xml
+install %{SOURCE3} pom.xml
 
 # Remove jar artifacts
 rm -rf CIEID/lib
@@ -140,10 +143,10 @@ rm -rf CIEID/lib
 
 # Install desktop configuration
 mkdir -p %{buildroot}%{_datadir}/pixmaps
-install -m 0644 %{SOURCE2} %{buildroot}%{_datadir}/pixmaps/cieid.png
+install -m 0644 CIEID/src/it/ipzs/cieid/res/logo_circle.png %{buildroot}%{_datadir}/pixmaps/cieid.png
 
 mkdir -p %{buildroot}%{_datadir}/applications
-install -m 0644 %{SOURCE3} %{buildroot}%{_datadir}/applications/cieid.desktop
+install -m 0644 %{SOURCE2} %{buildroot}%{_datadir}/applications/cieid.desktop
 
 # Create pkcs11 module link
 mkdir -p %{buildroot}%{_libdir}/pkcs11
@@ -151,7 +154,7 @@ ln -s ../libcie-pkcs11.so %{buildroot}%{_libdir}/pkcs11/libcie-pkcs11.so
 
 # Install module configuration for p11-kit
 mkdir -p %{buildroot}%{_datadir}/p11-kit/modules
-install -m 0644 %{SOURCE5} %{buildroot}%{_datadir}/p11-kit/modules/libcie-pkcs11.module
+install -m 0644 %{SOURCE4} %{buildroot}%{_datadir}/p11-kit/modules/libcie-pkcs11.module
 
 %files -f .mfiles
 %license LICENSE

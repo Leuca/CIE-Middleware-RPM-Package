@@ -1,8 +1,8 @@
 [Desktop Entry]
 Version=1.0
-Name=Cie ID
-Comment=Middleware for electronic Italian Identity Card
-Name[it]=Cie ID
+Name=CIE ID
+Comment=Middleware for the Italian Electronic Identity Card
+Name[it]=CIE ID
 Comment[it]=Middleware della CIE (Carta di Identità Elettronica)
 Exec=cieid
 Icon=cieid

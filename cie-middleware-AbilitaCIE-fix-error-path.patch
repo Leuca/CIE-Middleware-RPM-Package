@@ -1,0 +1,60 @@
+From 0764f206096a0964130c6edb4c7438e4642ee18d Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Fri, 1 Nov 2024 14:08:29 +0100
+Subject: [PATCH] cie-pkcs11: CSP: AbilitaCIE: fix error path
+
+Currently the code tries to abilitate every token available. This might
+cause an error when it is not necessary.
+
+Skip unrecognised tokens and stop at the first succesful abilitation.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/CSP/AbilitaCIE.cpp | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/cie-pkcs11/CSP/AbilitaCIE.cpp b/cie-pkcs11/CSP/AbilitaCIE.cpp
+index 94fd225..d6032b6 100644
+--- a/cie-pkcs11/CSP/AbilitaCIE.cpp
++++ b/cie-pkcs11/CSP/AbilitaCIE.cpp
+@@ -211,7 +211,17 @@ CK_RV CK_ENTRY AbilitaCIE(const char*  szPAN, const char*  szPIN, int* attempts,
+             foundCIE = false;
+             
+             ias.token.Reset();
+-            ias.SelectAID_IAS();
++            // Continue looking for CIE if the token is unrecognised
++            try
++            {
++                ias.SelectAID_IAS();
++            }
++            catch(logged_error &err)
++            {
++                free(ATR);
++                ATR = NULL;
++                continue;
++            }
+             ias.ReadPAN();
+         
+             
+@@ -227,6 +237,8 @@ CK_RV CK_ENTRY AbilitaCIE(const char*  szPAN, const char*  szPIN, int* attempts,
+             if (ias.IsEnrolled())
+             {
+                 LOG_ERROR("AbbinaCIE - CIE already enabled. Serial number: %s\n", IdServizi.data());
++                free(readers);
++                free(ATR);
+                 return CARD_ALREADY_ENABLED;
+             }
+ 
+@@ -391,6 +403,9 @@ CK_RV CK_ENTRY AbilitaCIE(const char*  szPAN, const char*  szPIN, int* attempts,
+             
+             std::string fullname = name + " " + surname;
+             completedCallBack(span.c_str(), fullname.c_str(), st_serial.c_str());
++
++            // A this point a CIE has been found, stop looking for it
++            break;
+ 		}
+         
+ 		if (!foundCIE) {
+-- 
+2.43.5
+

@@ -1,5 +1,28 @@
+From 6a6063b122eea07acedd2af05b2213ec670170a6 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Fri, 1 Nov 2024 15:48:20 +0100
+Subject: [PATCH] CSP: firmaConCIE: fix error path
+
+Currently the code tries to make a signature with every token in every
+card reader. This way if there are multiple tokens (either CIEs or not)
+the signature can be completed but an error pops up to the user wich is bad
+UX. Furthermore if an unrecognised token or a wrong CIE is evaluated
+before the correct CIE the function fails, which should not.
+
+Keep looking up for the correct CIE until all card readers are evaluated.
+Do not immediately fail if an unrecognised token is found.
+Fail on PAN mismatch only if the mismatch happens on every CIE.
+Stop looking if the correct CIE is found.
+
+Also free allocated resources before returning.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/CSP/FirmaConCIE.cpp | 45 +++++++++++++++++++++++++++++++---
+ 1 file changed, 41 insertions(+), 4 deletions(-)
+
 diff --git a/cie-pkcs11/CSP/FirmaConCIE.cpp b/cie-pkcs11/CSP/FirmaConCIE.cpp
-index 050d282..9f5bf6b 100644
+index 050d282..9e3b961 100644
 --- a/cie-pkcs11/CSP/FirmaConCIE.cpp
 +++ b/cie-pkcs11/CSP/FirmaConCIE.cpp
 @@ -10,6 +10,7 @@
@@ -18,7 +41,7 @@ index 050d282..9f5bf6b 100644
      try
      {
          std::map<uint8_t, ByteDynArray> hashSet;
-@@ -96,12 +98,21 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+@@ -96,12 +98,23 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
              IAS* ias = new IAS((CToken::TokenTransmitCallback)TokenTransmitCallback, atrBa);
              ias->SetCardContext(&conn);
              
@@ -32,6 +55,8 @@ index 050d282..9f5bf6b 100644
 +            }
 +            catch(logged_error &err)
 +            {
++                free(ATR);
++                ATR = NULL;
 +                delete ias;
 +                continue;
 +            }
@@ -43,7 +68,7 @@ index 050d282..9f5bf6b 100644
              ByteDynArray IntAuth;
              ias->SelectAID_CIE();
              ias->ReadDappPubKey(IntAuth);
-@@ -112,9 +123,12 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+@@ -112,9 +125,14 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
              ias->ReadIdServizi(IdServizi);
              ByteArray baPan = ByteArray((uint8_t*)pan, strlen(pan));
  
@@ -52,26 +77,32 @@ index 050d282..9f5bf6b 100644
              {
 -                return CARD_PAN_MISMATCH;
 +                panMismatch = true;
++                free(ATR);
++                ATR = NULL;
 +                delete ias;
 +                continue;
              }
              
              ByteDynArray FullPIN;
-@@ -134,9 +148,13 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+@@ -134,9 +152,17 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
              uint16_t ret = cieSign->sign(inFilePath, type, fullPinCStr, page, x, y, w, h, imagePathFile, outFilePath);
              if((ret & (0x63C0)) == 0x63C0)
              {
++                free(readers);
++                free(ATR);
 +                delete ias;
 +                delete cieSign;
                  return CKR_PIN_INCORRECT;
              }else if (ret == 0x6983)
              {
++                free(readers);
++                free(ATR);
 +                delete ias;
 +                delete cieSign;
                  return CKR_PIN_LOCKED;
              }
              
-@@ -148,7 +166,14 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+@@ -148,7 +174,14 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
              delete ias;
              delete cieSign;
  
@@ -86,7 +117,7 @@ index 050d282..9f5bf6b 100644
          }
          
          if (!foundCIE) {
-@@ -174,5 +199,9 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
+@@ -174,5 +207,9 @@ CK_RV CK_ENTRY firmaConCIE(const char* inFilePath, const char* type, const char*
          free(ATR);
  
      free(readers);
@@ -96,3 +127,6 @@ index 050d282..9f5bf6b 100644
 +
      return SCARD_S_SUCCESS;
  }
+-- 
+2.43.5
+

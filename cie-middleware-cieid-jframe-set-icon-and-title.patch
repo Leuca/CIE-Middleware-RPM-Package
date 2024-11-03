@@ -1,0 +1,64 @@
+From af0de22d6509eba48d9daad5b6c2b30f548f96b0 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sun, 3 Nov 2024 15:22:11 +0100
+Subject: [PATCH] CIEID: Set JFrame icon and Title
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ CIEID/src/it/ipzs/cieid/IntroFrame.java | 11 +++++++++++
+ CIEID/src/it/ipzs/cieid/MainFrame.java  | 10 ++++++++++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/CIEID/src/it/ipzs/cieid/IntroFrame.java b/CIEID/src/it/ipzs/cieid/IntroFrame.java
+index 4866ede..6b64425 100644
+--- a/CIEID/src/it/ipzs/cieid/IntroFrame.java
++++ b/CIEID/src/it/ipzs/cieid/IntroFrame.java
+@@ -2,6 +2,7 @@ package it.ipzs.cieid;
+ 
+ import java.awt.BorderLayout;
+ import java.awt.EventQueue;
++import java.awt.Image;
+ import java.awt.event.WindowAdapter;
+ import java.awt.event.WindowEvent;
+ 
+@@ -59,6 +60,16 @@ public class IntroFrame extends JFrame {
+ 	 * Create the frame.
+ 	 */
+ 	public IntroFrame() {
++		try
++		{
++			Image logoCircle = ImageIO.read(MainFrame.class.getResource("/it/ipzs/cieid/res/logo_circle.png"));
++			setIconImage(logoCircle);
++		}
++		catch(IOException e)
++		{
++			e.printStackTrace();
++		}
++		setTitle("Benvenuto in CIE ID");
+ 		setResizable(false);
+ 		setBackground(Color.WHITE);
+ 		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+diff --git a/CIEID/src/it/ipzs/cieid/MainFrame.java b/CIEID/src/it/ipzs/cieid/MainFrame.java
+index f1ea5ef..d764f36 100644
+--- a/CIEID/src/it/ipzs/cieid/MainFrame.java
++++ b/CIEID/src/it/ipzs/cieid/MainFrame.java
+@@ -413,6 +413,16 @@ public class MainFrame extends JFrame {
+         contentPane.add(leftPanel);
+         leftPanel.setLayout(null);
+         JLabel label_2 = new JLabel("");
++        try
++        {
++            Image logoCircle = ImageIO.read(MainFrame.class.getResource("/it/ipzs/cieid/res/logo_circle.png"));
++            setIconImage(logoCircle);
++        }
++        catch(IOException e)
++        {
++            e.printStackTrace();
++        }
++        setTitle("CIE ID");
+ 
+         try {
+             label_2.setIcon(new ImageIcon(Utils.scaleimage(80, 80, ImageIO.read(MainFrame.class.getResource("/it/ipzs/cieid/res/Logo_Cie_ID_Windowed@2x.png")))));
+-- 
+2.43.5
+
