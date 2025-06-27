@@ -1,5 +1,5 @@
 Name:			cie-middleware
-Version:		1.4.3.11
+Version:		1.4.3.12
 Release:		%autorelease
 Summary:		Middleware for CIE (Italian Electronic ID Card)
 License:		BSD-3-Clause
