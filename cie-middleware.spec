@@ -38,10 +38,10 @@ Patch22:			cie-middleware-PINManager-fix-error-path.patch
 Patch23:			cie-middleware-AbilitaCIE-fix-error-path.patch
 Patch24:			cie-middleware-cieid-jframe-set-icon-and-title.patch
 
-%if 0%{?fedora} < 40 || (0%{?rhel} && 0%{?rhel} < 10)
-BuildRequires:  maven-local-openjdk11
-%else
+%if 0%{?fedora} >= 40 || 0%{?rhel} >= 10
 BuildRequires:  maven-local
+%else
+BuildRequires:  maven-local-openjdk11
 %endif
 BuildRequires:	cmake
 BuildRequires:	git
