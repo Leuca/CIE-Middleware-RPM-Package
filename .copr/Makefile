@@ -1,9 +1,10 @@
 pkgs:
-	dnf -y install fedpkg rpmdevtools wget
+	dnf -y install fedpkg rpmdevtools rpmautospec
 
 sources: pkgs
-	wget $$(spectool -S cie-middleware.spec 2>/dev/null | grep Source0 | cut -d" " -f 2)
+	spectool --gf cie-middleware.spec
 
 srpm: sources
+	git config --global --add safe.directory .
 	fedpkg --release f40 srpm
 	cp *.src.rpm $(outdir)
