@@ -1,6 +1,6 @@
-From f4d19af4c7cdf59d924006d2fc7d885fee0b9140 Mon Sep 17 00:00:00 2001
+From e24e62e74fc87e3ae8ee7ece4c068bfce1fed803 Mon Sep 17 00:00:00 2001
 From: Luca Magrone <luca@magrone.cc>
-Date: Wed, 23 Oct 2024 15:50:44 +0200
+Date: Thu, 28 Aug 2025 10:36:50 +0200
 Subject: [PATCH] cie_sign_sdk: PdfSignatureGenerator: Rewrite implementation
  of PADES signature
 
@@ -13,18 +13,18 @@ Also fix loading document for verification with the correct method.
 
 Signed-off-by: Luca Magrone <luca@magrone.cc>
 ---
- cie_sign_sdk/include/PdfSignatureGenerator.h |  54 +-
- cie_sign_sdk/include/PdfVerifier.h           |  12 +-
- cie_sign_sdk/src/PdfSignatureGenerator.cpp   | 506 ++++++++++---------
+ cie_sign_sdk/include/PdfSignatureGenerator.h |  50 +-
+ cie_sign_sdk/include/PdfVerifier.h           |   8 +-
+ cie_sign_sdk/src/PdfSignatureGenerator.cpp   | 510 ++++++++++---------
  cie_sign_sdk/src/PdfVerifier.cpp             | 105 +++-
  cie_sign_sdk/src/disigonsdk.cpp              |  81 ++-
- 5 files changed, 470 insertions(+), 288 deletions(-)
+ 5 files changed, 466 insertions(+), 288 deletions(-)
 
 diff --git a/cie_sign_sdk/include/PdfSignatureGenerator.h b/cie_sign_sdk/include/PdfSignatureGenerator.h
-index 5a19d6f..90fe2c3 100644
+index 5a19d6f..1eebdfb 100644
 --- a/cie_sign_sdk/include/PdfSignatureGenerator.h
 +++ b/cie_sign_sdk/include/PdfSignatureGenerator.h
-@@ -10,11 +10,18 @@
+@@ -10,11 +10,14 @@
  #ifndef _PDFSIGNATUREGENERATOR_H_
  #define _PDFSIGNATUREGENERATOR_H_
  
@@ -32,13 +32,9 @@ index 5a19d6f..90fe2c3 100644
 -#include "podofo/doc/PdfSignOutputDevice.h"
 -#include "podofo/doc/PdfSignatureField.h"
 +#include <podofo/podofo.h>
-+#if PODOFO_VERSION_MAJOR < 1
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +#include <podofo/doc/PdfSignOutputDevice.h>
 +#include <podofo/doc/PdfSignatureField.h>
-+#endif
-+#else
-+#error PoDoFo version not supported (yet)
 +#endif
  #include "ASN1/UUCByteArray.h"
  
@@ -46,11 +42,11 @@ index 5a19d6f..90fe2c3 100644
  
  using namespace PoDoFo;
  using namespace std;
-@@ -34,37 +41,46 @@ public:
+@@ -34,37 +37,46 @@ public:
  	
  	void InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter, const char* szImagePath, const char* szDescription, const char* szGraphometricData, const char* szVersion);
  	
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	void GetBufferForSignature(UUCByteArray& toSign);
  	
  	void SetSignature(const char* signature, int len);
@@ -66,14 +62,14 @@ index 5a19d6f..90fe2c3 100644
  	const double getHeight(int pageIndex);
 -	
 +
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  private:
 +#endif
 +
  	PdfMemDocument* m_pPdfDocument;
 -	
 +
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +private:
 +
  	PdfSignatureField* m_pSignatureField;
@@ -110,10 +106,10 @@ index 5a19d6f..90fe2c3 100644
  
  #endif // _PDFSIGNATUREGENERATOR_H_
 diff --git a/cie_sign_sdk/include/PdfVerifier.h b/cie_sign_sdk/include/PdfVerifier.h
-index 66f971d..837b708 100644
+index 66f971d..de6ff60 100644
 --- a/cie_sign_sdk/include/PdfVerifier.h
 +++ b/cie_sign_sdk/include/PdfVerifier.h
-@@ -11,9 +11,15 @@
+@@ -11,9 +11,11 @@
  #define _PDFVERIFIER_H_
  
  
@@ -121,19 +117,15 @@ index 66f971d..837b708 100644
 -#include "podofo/doc/PdfSignOutputDevice.h"
 -#include "podofo/doc/PdfSignatureField.h"
 +#include <podofo/podofo.h>
-+#if PODOFO_VERSION_MAJOR < 1
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +#include <podofo/doc/PdfSignOutputDevice.h>
 +#include <podofo/doc/PdfSignatureField.h>
-+#endif
-+#else
-+#error PoDoFo version not supported (yet)
 +#endif
  #include "ASN1/UUCByteArray.h"
  #include "disigonsdk.h"
  
 diff --git a/cie_sign_sdk/src/PdfSignatureGenerator.cpp b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
-index be4dc0c..9fbd54e 100644
+index be4dc0c..ecffa06 100644
 --- a/cie_sign_sdk/src/PdfSignatureGenerator.cpp
 +++ b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
 @@ -6,12 +6,17 @@
@@ -168,7 +160,7 @@ index be4dc0c..9fbd54e 100644
 +PdfSignatureGenerator::PdfSignatureGenerator() :
 +	m_pSignatureField(NULL),
 +	m_pSignOutputDevice(NULL),
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +	m_pFinalOutDevice(NULL),
 +	m_pSignDocbuffer(NULL),
 +#endif
@@ -180,7 +172,7 @@ index be4dc0c..9fbd54e 100644
  		delete m_pPdfDocument;
 -	
 +
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	if(m_pSignatureField)
  		delete m_pSignatureField;
 +#endif
@@ -188,7 +180,7 @@ index be4dc0c..9fbd54e 100644
  	if(m_pSignOutputDevice)
  		delete m_pSignOutputDevice;
  	
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	if(m_pFinalOutDevice)
  		delete m_pFinalOutDevice;
  	
@@ -217,7 +209,7 @@ index be4dc0c..9fbd54e 100644
 -		printf("OK m_pPdfDocument");
 -		int nSigns = PDFVerifier::GetNumberOfSignatures(m_pPdfDocument);
 -		printf("OK nSigns: %d", nSigns);
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +		m_pPdfDocument->LoadFromBuffer(pdf, len, true);
  
 -		if(nSigns > 0)
@@ -257,7 +249,7 @@ index be4dc0c..9fbd54e 100644
  void PdfSignatureGenerator::InitSignature(int pageIndex, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter)
  {
  	LOG_DBG((0, "quella con tutti 0\n", ""));
-@@ -115,187 +108,298 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+@@ -115,187 +108,302 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
  
  void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float bottom, float width, float height, const char* szReason, const char* szReasonLabel, const char* szName, const char* szNameLabel, const char* szLocation, const char* szLocationLabel, const char* szFieldName, const char* szSubFilter, const char* szImagePath, const char* szDescription, const char* szGraphometricData, const char* szVersion)
  {
@@ -266,7 +258,7 @@ index be4dc0c..9fbd54e 100644
      //LOG_DBG((0, "--> InitSignature", ""));
      
 -             
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +	int fulllen = m_actualLen * 2 + SIGNATURE_SIZE * 2;
 +
  	if(m_pSignatureField)
@@ -299,7 +291,7 @@ index be4dc0c..9fbd54e 100644
 +	float width0 = width * cropBoxWidth;
 +	float height0 = height * cropBoxHeight;
 +
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	PdfRect rect(left0, bottom0, width0, height0);
 -	
 -	LOG_DBG((0, "InitSignature", "PdfSignatureField"));
@@ -344,7 +336,7 @@ index be4dc0c..9fbd54e 100644
 +
  	LOG_DBG((0, "InitSignature", "szReason OK"));
  
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +	// /T: SignatureN
 +	if(szFieldName && szFieldName[0])
 +	{
@@ -367,7 +359,7 @@ index be4dc0c..9fbd54e 100644
  	LOG_DBG((0, "InitSignature", "szLocation OK"));
  
  	PdfDate now;
-+#if PODOFO_VERSION_MINOR >= 10
++#if PODOFO_VERSION_MINOR >= 10 || PODOFO_VERSION_MAJOR > 0
 +	now = PdfDate::LocalNow();
 +#endif
  	m_pSignatureField->SetSignatureDate(now);
@@ -382,7 +374,7 @@ index be4dc0c..9fbd54e 100644
 -		PdfString name(szName);
 -		PdfString nameLabel(szNameLabel);
 -		m_pSignatureField->SetSignatureName(nameLabel, name);	
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +		m_pSignatureField->GetSignatureObject()->GetDictionary()
 +			.AddKey(PdfName("Name"), PdfObject(PdfString(szName)));
 +#else
@@ -401,7 +393,7 @@ index be4dc0c..9fbd54e 100644
 +	// Create graphical signature with stamp if we have a picture
  	if(width * height > 0)
  	{
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +		PdfXObject sigXObject(rect, m_pPdfDocument);
 +#else
 +		auto sigXObject = m_pPdfDocument->CreateXObjectForm(rect);
@@ -441,7 +433,7 @@ index be4dc0c..9fbd54e 100644
 +			streampos imgBufferSize = 0;
 +			ifstream img(szImagePath, ios::in|ios::binary|ios::ate);
 +			std::string signatureStamp;
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +			PdfImage image(m_pPdfDocument);
 +#else
 +			auto image = m_pPdfDocument->CreateImage();
@@ -456,7 +448,7 @@ index be4dc0c..9fbd54e 100644
  
 -	LOG_DBG((0, "InitSignature", "szGraphometricData OK"));
 +				// Increase space we have to allocate
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +				fulllen += imgBufferSize * 2;
 +#endif
  
@@ -489,7 +481,7 @@ index be4dc0c..9fbd54e 100644
 +				signatureStamp.append(szReason);
 +			}
 +
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +			image.LoadFromPngData((const unsigned char*)imgBuffer, imgBufferSize);
 +			// Scale using width to try to avoid squeezing image
 +			scale = (width0 / image.GetWidth());
@@ -508,14 +500,14 @@ index be4dc0c..9fbd54e 100644
 -			m_pPdfDocument->Write(&pdfOutDevice);
 -			mainDoclen = pdfOutDevice.GetLength();
 +			// Draw signature
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +			painter.SetPage(&sigXObject);
 +#else
 +			painter.SetCanvas(*sigXObject);
 +#endif
 +			painter.Save();
 +			painter.Restore();
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +			painter.DrawImage(left0, bottom0, &image, scale, scale);
 +#else
 +			painter.DrawImage(*image, left0, bottom0, scale, scale);
@@ -526,7 +518,7 @@ index be4dc0c..9fbd54e 100644
 +				delete[] imgBuffer;
 +
 +			// Create signature stamp
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +			PdfFont* font = m_pPdfDocument->CreateFont(FONT_NAME, false,
 +					PdfEncodingFactory::GlobalWinAnsiEncodingInstance(),
 +					// We set no embedding but it doesn't work
@@ -617,10 +609,14 @@ index be4dc0c..9fbd54e 100644
 +			Rect sigRect = Rect(left0 + TXT_PAD, bottom0 - (TXT_PAD * 2), width0, height0);
 +			painter.TextState.SetFont(*font, FONT_SIZE);
 +			painter.DrawTextMultiLine(signatureStamp, sigRect);
++
++#if PODOFO_VERSION_MAJOR < 1
++			m_pSignatureField->SetAppearanceStream(*sigXObject);
++#else
++			m_pSignatureField->GetWidget()->SetAppearanceStream(*sigXObject);
++#endif
  
 -	m_pSignOutputDevice->AdjustByteRange();
-+			m_pSignatureField->SetAppearanceStream(*sigXObject);
-+
 +			LOG_DBG((0, "InitSignature", "SetAppearanceStream OK"));
  
 -	LOG_DBG((0, "InitSignature", "AdjustByteRange OK"));
@@ -637,7 +633,7 @@ index be4dc0c..9fbd54e 100644
 +#endif
  }
  
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  void PdfSignatureGenerator::GetBufferForSignature(UUCByteArray& toSign)
  {
 -	//int fulllen = m_actualLen * 2 + SINGNATURE_SIZE * 2;
@@ -665,7 +661,7 @@ index be4dc0c..9fbd54e 100644
  	delete buffer;
  }
  
-@@ -303,7 +407,9 @@ void PdfSignatureGenerator::SetSignature(const char* signature, int len)
+@@ -303,7 +411,9 @@ void PdfSignatureGenerator::SetSignature(const char* signature, int len)
  {
  	PdfData signatureData(signature, len);
  	m_pSignOutputDevice->SetSignature(signatureData);
@@ -675,11 +671,11 @@ index be4dc0c..9fbd54e 100644
  
  void PdfSignatureGenerator::GetSignedPdf(UUCByteArray& signedPdf)
  {
-@@ -311,114 +417,38 @@ void PdfSignatureGenerator::GetSignedPdf(UUCByteArray& signedPdf)
+@@ -311,114 +421,38 @@ void PdfSignatureGenerator::GetSignedPdf(UUCByteArray& signedPdf)
  	char* szSignedPdf = new char[finalLength];
  	
  	m_pSignOutputDevice->Seek(0);
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	int nRead = m_pSignOutputDevice->Read(szSignedPdf, finalLength);
 -	
 +
@@ -695,7 +691,7 @@ index be4dc0c..9fbd54e 100644
  
  const double PdfSignatureGenerator::getWidth(int pageIndex) {
  	if (m_pPdfDocument) {
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  		PdfPage* pPage = m_pPdfDocument->GetPage(pageIndex);
  		return pPage->GetPageSize().GetWidth();
 +#else
@@ -707,7 +703,7 @@ index be4dc0c..9fbd54e 100644
  
  const double PdfSignatureGenerator::getHeight(int pageIndex) {
  	if (m_pPdfDocument) {
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  		PdfPage* pPage = m_pPdfDocument->GetPage(pageIndex);
  		return pPage->GetPageSize().GetHeight();
 +#else
@@ -806,7 +802,7 @@ index be4dc0c..9fbd54e 100644
 -		return false;
 -}
 diff --git a/cie_sign_sdk/src/PdfVerifier.cpp b/cie_sign_sdk/src/PdfVerifier.cpp
-index 2285603..5fb0436 100644
+index 2285603..45b980b 100644
 --- a/cie_sign_sdk/src/PdfVerifier.cpp
 +++ b/cie_sign_sdk/src/PdfVerifier.cpp
 @@ -42,7 +42,11 @@ int PDFVerifier::Load(const char* pdf, int len)
@@ -814,7 +810,7 @@ index 2285603..5fb0436 100644
  	{
  		m_pPdfDocument = new PdfMemDocument();
 -		m_pPdfDocument->Load(pdf, len);
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +		m_pPdfDocument->LoadFromBuffer(pdf, len, true);
 +#else
 +		m_pPdfDocument->LoadFromBuffer(bufferview(pdf, len));
@@ -826,7 +822,7 @@ index 2285603..5fb0436 100644
      try
      {
          m_pPdfDocument = new PdfMemDocument();
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +        m_pPdfDocument->Load(szFilePath, false);
 +#else
          m_pPdfDocument->Load(szFilePath);
@@ -838,7 +834,7 @@ index 2285603..5fb0436 100644
      
      try {
          
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
 +        doc.Load(szFilePath, false);
 +#else
          doc.Load(szFilePath);
@@ -853,7 +849,7 @@ index 2285603..5fb0436 100644
 -    printf("GetNumberOfSignatures");
 -    
  	/// Find the document catalog dictionary
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	const PdfObject *const trailer = pPdfDocument->GetTrailer();
  	if (!trailer->IsDictionary())
  		return -1;
@@ -926,7 +922,7 @@ index 2285603..5fb0436 100644
  		return -1;
  	
  	/// Find the document catalog dictionary
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	const PdfObject *const trailer = m_pPdfDocument->GetTrailer();
  	if (!trailer->IsDictionary())
  		return -1;
@@ -953,7 +949,7 @@ index 2285603..5fb0436 100644
  	if (keyFTValue == 0) 
  		return -2;
  	
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	string value;
  	keyFTValue->ToString(value);
  	if (value != "/Sig") 
@@ -971,7 +967,7 @@ index 2285603..5fb0436 100644
  		const PdfObject *const keySubFilter = signature->GetDictionary().GetKey(PdfName("SubFilter"));
  		keySubFilter->ToString(subfilter);
 +
-+#if PODOFO_VERSION_MINOR >= 10
++#if PODOFO_VERSION_MINOR >= 10 || PODOFO_VERSION_MAJOR > 0
 +		// Podofo 0.10.x adds an invisible trailing character that makes comparison fail
 +		if(!subfilter.empty())
 +			subfilter.pop_back();
@@ -1001,7 +997,7 @@ index 2285603..5fb0436 100644
  	if (keyFTValue == 0) 
  		return false;
  	
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	string value;
  	keyFTValue->ToString(value);
  	if (value != "/Sig") 
@@ -1028,7 +1024,7 @@ index 2285603..5fb0436 100644
  		return -1;
  	
  	/// Find the document catalog dictionary
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	const PdfObject *const trailer = m_pPdfDocument->GetTrailer();
  	if (!trailer->IsDictionary())
  		return -1;
@@ -1053,7 +1049,7 @@ index 2285603..5fb0436 100644
  	if (keyFTValue == 0) 
  		return -2;
  	
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	string value;
  	keyFTValue->ToString(value);
  	if (value != "/Sig") 
@@ -1070,7 +1066,7 @@ index 2285603..5fb0436 100644
  	}
  	
  	PdfArray rectArray = keyRect->GetArray();
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	PdfRect rect;
 +#else
 +	Rect rect;
@@ -1079,7 +1075,7 @@ index 2285603..5fb0436 100644
  	
  	appearanceInfo.left = rect.GetLeft();
  	appearanceInfo.bottom = rect.GetBottom();
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
  	appearanceInfo.width = rect.GetWidth();
  	appearanceInfo.heigth = rect.GetHeight();
 +#else
@@ -1090,7 +1086,7 @@ index 2285603..5fb0436 100644
  	
  	const PdfObject *const signature = pDoc->GetObjects().GetObject(keyVValue->GetReference());
 diff --git a/cie_sign_sdk/src/disigonsdk.cpp b/cie_sign_sdk/src/disigonsdk.cpp
-index b807d92..9b6509d 100644
+index b807d92..5b3bcfb 100644
 --- a/cie_sign_sdk/src/disigonsdk.cpp
 +++ b/cie_sign_sdk/src/disigonsdk.cpp
 @@ -22,7 +22,7 @@
@@ -1106,7 +1102,7 @@ index b807d92..9b6509d 100644
  
  } DISIGON_SIGN_CONTEXT;
  
-+#if PODOFO_VERSION_MINOR >= 10
++#if PODOFO_VERSION_MINOR >= 10 || PODOFO_VERSION_MAJOR > 0
 +class CIEPdfSigner : public PdfSigner
 +{
 +public:
@@ -1155,7 +1151,7 @@ index b807d92..9b6509d 100644
  
 +    pContext->pSignatureGenerator->SetHashAlgo(pContext->nHashAlgo);
 +
-+#if PODOFO_VERSION_MINOR < 10
++#if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
      UUCByteArray buffer;
      sigGen.GetBufferForSignature(buffer);
  
@@ -1186,7 +1182,7 @@ index b807d92..9b6509d 100644
      return DISIGON_FILETYPE_PLAINTEXT;
  }
  
-+#if PODOFO_VERSION_MINOR >= 10
++#if PODOFO_VERSION_MINOR >= 10 || PODOFO_VERSION_MAJOR > 0
 +void CIEPdfSigner::ComputeSignature(charbuff& buffer, bool dryrun)
 +{
 +	if(dryrun)
@@ -1213,5 +1209,5 @@ index b807d92..9b6509d 100644
 +}
 +#endif
 -- 
-2.43.5
+2.51.0
 
