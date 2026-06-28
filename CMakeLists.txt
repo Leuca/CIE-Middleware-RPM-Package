@@ -34,6 +34,7 @@ set(SDK_SRC_LIST
     ${LIBCIE_SOURCE_DIR}/CIESigner.cpp
     ${LIBCIE_SOURCE_DIR}/CIEEngine.c
     ${LIBCIE_SOURCE_DIR}/CIEEngineHelper.c
+    ${LIBCIE_SOURCE_DIR}/CIEProvider.c
     ${LIBCIE_SOURCE_DIR}/CertStore.cpp
     ${LIBCIE_SOURCE_DIR}/CounterSignatureGenerator.cpp
     ${LIBCIE_SOURCE_DIR}/SignatureGenerator.cpp

@@ -37,6 +37,9 @@ Patch21:			cie-middleware-cieid-make-window-resizable.patch
 Patch22:			cie-middleware-PINManager-fix-error-path.patch
 Patch23:			cie-middleware-AbilitaCIE-fix-error-path.patch
 Patch24:			cie-middleware-cieid-jframe-set-icon-and-title.patch
+Patch25:			cie-middleware-openssl-provider.patch
+Patch26:			cie-middleware-fix-signature-placement.patch
+Patch27:			cie-middleware-prevent-crashes.patch
 
 %if 0%{?fedora} >= 40 || 0%{?rhel} >= 10
 %if 0%{?fedora} > 42 || 0%{?rhel} > 10
@@ -58,9 +61,6 @@ BuildRequires:	glibc
 BuildRequires:	libpng-devel
 BuildRequires:	libxml2-devel
 BuildRequires:	openssl-devel
-%if 0%{?fedora} >= 41
-BuildRequires:	openssl-devel-engine
-%endif
 BuildRequires:	zlib-devel
 BuildRequires:	fontconfig-devel
 BuildRequires:	pcsc-lite-devel

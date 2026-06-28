@@ -1,0 +1,149 @@
+From 5db84c93c4d403850b421920c0929858e859f0a7 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sun, 28 Jun 2026 02:10:40 +0200
+Subject: [PATCH] cie_sign_sdk: PdfSignatureGenerator: fix signature placement
+ box
+
+Fix signature box drift in the newer versions of PoDoFo (1.x).
+The box drifts from the top-left corner the more you put it distant to
+it.
+Make sure in the signature the text doesn't overlap with the image
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ CIEID/src/it/ipzs/cieid/Firma/PdfPreview.java | 37 ++++++++++++++++---
+ cie_sign_sdk/src/PdfSignatureGenerator.cpp    | 20 +++++++---
+ 2 files changed, 46 insertions(+), 11 deletions(-)
+
+diff --git a/CIEID/src/it/ipzs/cieid/Firma/PdfPreview.java b/CIEID/src/it/ipzs/cieid/Firma/PdfPreview.java
+index 286b5c9..ee397dd 100644
+--- a/CIEID/src/it/ipzs/cieid/Firma/PdfPreview.java
++++ b/CIEID/src/it/ipzs/cieid/Firma/PdfPreview.java
+@@ -34,6 +34,12 @@ public class PdfPreview {
+     private ImageIcon imgIcon;
+     private MoveablePicture signImage;
+     private JPanel imgPanel;
++    // Size of the page bitmap as actually drawn inside imgPanel. The page is
++    // letterboxed (centered) within the panel, so these differ from the panel
++    // size and must be used as the reference when converting the signature box
++    // position into page fractions.
++    private int imgWidth;
++    private int imgHeight;
+     
+     public PdfPreview(JPanel panelPdfPreview, String pdfFilePath, String signImagePath)
+     {
+@@ -89,8 +95,13 @@ public class PdfPreview {
+     	int tmpImgWidth = tmpImg.getWidth(null);
+     	int tmpImgHeight =  tmpImg.getHeight(null);
+     	
+-    	int imgHeight = height;
+-    	int imgWidth = width;
++	// Remember the previous page size so the signature box can be re-anchored
++	// to the same relative spot when the preview is re-rendered at a new size.
++	int prevImgWidth = imgWidth;
++	int prevImgHeight = imgHeight;
++	
++	imgHeight = height;
++	imgWidth = width;
+     
+     	double signImgMult = 1.0;
+ 
+@@ -117,6 +128,17 @@ public class PdfPreview {
+ 		signImgMult = imgWidth / 300.0;
+     	
+ 		signImage.setSize((int)(50.0 * signImgMult), (int)(25.0 * signImgMult));
++		// Re-anchor the box to the same relative page position. Without this, a
++		// box placed while the preview was larger keeps its old pixel coordinates;
++		// divided by the now-smaller page they yield fractions > 1 (off-page).
++		if (prevImgWidth > 0 && prevImgHeight > 0)
++		{
++			int nx = (int)((long) signImage.getX() * imgWidth / prevImgWidth);
++			int ny = (int)((long) signImage.getY() * imgHeight / prevImgHeight);
++			nx = Math.max(0, Math.min(nx, imgWidth - signImage.getWidth()));
++			ny = Math.max(0, Math.min(ny, imgHeight - signImage.getHeight()));
++			signImage.setLocation(nx, ny);
++		}
+ 		signImage.reloadImage();
+ 		imgIcon.setImage(tmpImg.getScaledInstance(imgWidth, imgHeight, Image.SCALE_AREA_AVERAGING));
+ 		imgLabel.setIcon(imgIcon);
+@@ -163,10 +185,13 @@ public class PdfPreview {
+     {
+     	float infos[] = new float[4];
+     	
+-    	float x = ((float)signImage.getX() / (float)imgPanel.getWidth());
+-    	float y = ((float)(signImage.getY() + signImage.getHeight())/ (float)imgPanel.getHeight());
+-    	float w = ((float)signImage.getWidth() / (float)imgPanel.getWidth());
+-    	float h = ((float)signImage.getHeight() / (float)imgPanel.getHeight());
++	// The page image exactly fills imgPanel (imgPanel == imgLabel == icon), so the
++	// signature box position in panel coordinates maps directly to page fractions.
++	// showPreview() keeps the box anchored to the page across resizes.
++	float x = ((float)signImage.getX() / (float)imgWidth);
++	float y = ((float)(signImage.getY() + signImage.getHeight()) / (float)imgHeight);
++	float w = ((float)signImage.getWidth() / (float)imgWidth);
++	float h = ((float)signImage.getHeight() / (float)imgHeight);
+     	
+     	infos[0] = x;
+     	infos[1] = y;
+diff --git a/cie_sign_sdk/src/PdfSignatureGenerator.cpp b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
+index e8185ca..7c08357 100644
+--- a/cie_sign_sdk/src/PdfSignatureGenerator.cpp
++++ b/cie_sign_sdk/src/PdfSignatureGenerator.cpp
+@@ -122,16 +122,20 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+ 
+ 	float cropBoxWidth = cropBox.GetWidth();
+ 	float cropBoxHeight = cropBox.GetHeight();
++	float cropBoxLeft = cropBox.GetLeft();
++	float cropBoxBottom = cropBox.GetBottom();
+ #else
+ 	PdfPage* pPage = &m_pPdfDocument->GetPages().GetPageAt(pageIndex);
+ 	Rect cropBox = pPage->GetCropBox();
+ 
+ 	float cropBoxWidth = cropBox.Width;
+ 	float cropBoxHeight = cropBox.Height;
++	float cropBoxLeft = cropBox.X;
++	float cropBoxBottom = cropBox.Y;
+ #endif
+     
+-	float left0 = left * cropBoxWidth;
+-	float bottom0 = cropBoxHeight - (bottom * cropBoxHeight);
++	float left0 = cropBoxLeft + left * cropBoxWidth;
++	float bottom0 = cropBoxBottom + cropBoxHeight - (bottom * cropBoxHeight);
+     
+ 	float width0 = width * cropBoxWidth;
+ 	float height0 = height * cropBoxHeight;
+@@ -219,7 +223,13 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+ #if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
+ 		PdfXObject sigXObject(rect, m_pPdfDocument);
+ #else
+-		auto sigXObject = m_pPdfDocument->CreateXObjectForm(rect);
++		// The appearance form has its own coordinate space: a viewer maps its
++		// BBox onto the widget /Rect (set above). Anchor the BBox at the local
++		// origin and paint content relative to (0,0); the /Rect handles the page
++		// placement. Reusing the offset page rect here caused the offset to be
++		// applied twice, drifting the graphic proportionally to its distance from
++		// the page origin.
++		auto sigXObject = m_pPdfDocument->CreateXObjectForm(Rect(0, 0, width0, height0));
+ #endif
+ 		PdfPainter painter;
+ 
+@@ -284,7 +294,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+ #if PODOFO_VERSION_MAJOR < 1 && PODOFO_VERSION_MINOR < 10
+ 			painter.DrawImage(left0, bottom0, &image, scale, scale);
+ #else
+-			painter.DrawImage(*image, left0, bottom0, scale, scale);
++			painter.DrawImage(*image, 0, 0, scale, scale);
+ #endif
+ 
+ 			// Release buffer memory
+@@ -361,7 +371,7 @@ void PdfSignatureGenerator::InitSignature(int pageIndex, float left, float botto
+ 	}
+ #else
+ 			PdfFont* font = m_pPdfDocument->GetFonts().SearchFont(FONT_NAME);
+-			Rect sigRect = Rect(left0 + TXT_PAD, bottom0 - TXT_PAD, width0, height0);
++			Rect sigRect = Rect(TXT_PAD, TXT_PAD, width0 - 2 * TXT_PAD, height0 - 2 * TXT_PAD);
+ 			painter.TextState.SetFont(*font, FONT_SIZE);
+ 			painter.DrawTextMultiLine(signatureStamp, sigRect);
+ 
+-- 
+2.54.0
+

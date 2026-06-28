@@ -1,0 +1,929 @@
+From 8e3085767c6066231a44f3f058fbd32cf7a21bc0 Mon Sep 17 00:00:00 2001
+From: Luca Magrone <luca@magrone.cc>
+Date: Sun, 28 Jun 2026 01:22:11 +0200
+Subject: [PATCH] Implement OpenSSL provider
+
+Support newer OpenSSL provider API if the detected version is at least
+3.0.0, fall back to the legacy code for older versions.
+
+Signed-off-by: Luca Magrone <luca@magrone.cc>
+---
+ cie-pkcs11/Sign/CIEEngine.h        |  19 +-
+ cie_sign_sdk/include/CIEEngine.h   |  19 +-
+ cie_sign_sdk/include/CIEProvider.h |  99 +++++
+ cie_sign_sdk/src/CIEEngine.c       |  38 ++
+ cie_sign_sdk/src/CIEProvider.c     | 659 +++++++++++++++++++++++++++++
+ 5 files changed, 828 insertions(+), 6 deletions(-)
+ create mode 100644 cie_sign_sdk/include/CIEProvider.h
+ create mode 100644 cie_sign_sdk/src/CIEProvider.c
+
+diff --git a/cie-pkcs11/Sign/CIEEngine.h b/cie-pkcs11/Sign/CIEEngine.h
+index 15af145..0fe86bb 100644
+--- a/cie-pkcs11/Sign/CIEEngine.h
++++ b/cie-pkcs11/Sign/CIEEngine.h
+@@ -3,6 +3,7 @@
+ //  CIESDK
+ //
+ //  Created by ugo chirico on 26.02.2020.
++//  Updated for OpenSSL 3.x Provider support.
+ //
+ 
+ #ifndef CIEEngine_h
+@@ -11,12 +12,24 @@
+ #include <stdio.h>
+ #include <openssl/crypto.h>
+ #include <openssl/objects.h>
+-#include <openssl/engine.h>
++#include <openssl/opensslv.h>
+ 
+-typedef short (*sign)(unsigned char* tosign, size_t len, unsigned char* signature, size_t* psiglen);
++#if OPENSSL_VERSION_NUMBER >= 0x30000000
++# include <openssl/provider.h>
++# include <openssl/evp.h>
++# include "CIEProvider.h"
++#else
++# include <openssl/engine.h>
++#endif
+ 
++typedef short (*sign)(unsigned char* tosign, size_t len, unsigned char* signature, size_t* psiglen);
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x30000000
++/* Provider-based API (OpenSSL >= 3.0) */
++void engine_load_cie(sign sign_cb);  /* compatibility wrapper → provider_load_cie */
++#else
++/* Legacy engine-based API (OpenSSL < 3.0) */
+ void engine_load_cie(sign sign_cb);
+-
++#endif
+ 
+ #endif /* CIEEngine_h */
+diff --git a/cie_sign_sdk/include/CIEEngine.h b/cie_sign_sdk/include/CIEEngine.h
+index 15af145..0fe86bb 100644
+--- a/cie_sign_sdk/include/CIEEngine.h
++++ b/cie_sign_sdk/include/CIEEngine.h
+@@ -3,6 +3,7 @@
+ //  CIESDK
+ //
+ //  Created by ugo chirico on 26.02.2020.
++//  Updated for OpenSSL 3.x Provider support.
+ //
+ 
+ #ifndef CIEEngine_h
+@@ -11,12 +12,24 @@
+ #include <stdio.h>
+ #include <openssl/crypto.h>
+ #include <openssl/objects.h>
+-#include <openssl/engine.h>
++#include <openssl/opensslv.h>
+ 
+-typedef short (*sign)(unsigned char* tosign, size_t len, unsigned char* signature, size_t* psiglen);
++#if OPENSSL_VERSION_NUMBER >= 0x30000000
++# include <openssl/provider.h>
++# include <openssl/evp.h>
++# include "CIEProvider.h"
++#else
++# include <openssl/engine.h>
++#endif
+ 
++typedef short (*sign)(unsigned char* tosign, size_t len, unsigned char* signature, size_t* psiglen);
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x30000000
++/* Provider-based API (OpenSSL >= 3.0) */
++void engine_load_cie(sign sign_cb);  /* compatibility wrapper → provider_load_cie */
++#else
++/* Legacy engine-based API (OpenSSL < 3.0) */
+ void engine_load_cie(sign sign_cb);
+-
++#endif
+ 
+ #endif /* CIEEngine_h */
+diff --git a/cie_sign_sdk/include/CIEProvider.h b/cie_sign_sdk/include/CIEProvider.h
+new file mode 100644
+index 0000000..00ec8e1
+--- /dev/null
++++ b/cie_sign_sdk/include/CIEProvider.h
+@@ -0,0 +1,99 @@
++//
++//  CIEProvider.h
++//  CIESDK
++//
++//  OpenSSL 3.x Provider for Italian CIE (Carta d'Identità Elettronica)
++//  Replaces the deprecated ENGINE-based CIEEngine implementation.
++//
++//  Usage:
++//    1. Set cie_certificate / cie_certlen globals with the DER-encoded
++//       X.509 certificate read from the CIE card.
++//    2. Call provider_load_cie(sign_cb) to load the provider.
++//    3. Use cie_provider_get_pkey() to obtain an EVP_PKEY that routes
++//       RSA signing to the smart card callback.
++//    4. Use standard OpenSSL EVP_PKEY_sign() / EVP_DigestSign() APIs.
++//    5. Call provider_unload_cie() when done.
++//
++
++#ifndef CIEProvider_h
++#define CIEProvider_h
++
++#include <stdio.h>
++#include <openssl/provider.h>
++#include <openssl/evp.h>
++
++// ---------------------------------------------------------------------------
++// Global variables — must be set by the caller before provider_load_cie()
++// ---------------------------------------------------------------------------
++
++/** DER-encoded X.509 certificate read from the CIE card. */
++extern const unsigned char* cie_certificate;
++
++/** Length in bytes of cie_certificate. */
++extern unsigned long cie_certlen;
++
++/** PIN (optional, can be NULL). */
++extern unsigned char* cie_pin;
++
++/** PIN length. */
++extern unsigned long cie_pinlen;
++
++/** Last error code from the card (0 = success). */
++extern unsigned short cie_error;
++
++// ---------------------------------------------------------------------------
++// Signing callback type
++// ---------------------------------------------------------------------------
++
++/**
++ * Callback invoked to perform an RSA signature on the smart card.
++ *
++ * @param tosign       DigestInfo structure to sign.
++ * @param len          Length of tosign in bytes.
++ * @param signature    Output buffer for the signature.
++ * @param psiglen      [in/out] On input: size of signature buffer.
++ *                     On output: actual signature length.
++ * @return             0x9000 on success, error code otherwise.
++ */
++typedef short (*sign_cb)(unsigned char* tosign, size_t len,
++                         unsigned char* signature, size_t* psiglen);
++
++// ---------------------------------------------------------------------------
++// Provider management
++// ---------------------------------------------------------------------------
++
++/**
++ * Load the CIE provider and register it with OpenSSL.
++ *
++ * @param sign_cb  Callback for RSA signing operations on the smart card.
++ * @return         Provider handle, or NULL on failure.
++ */
++OSSL_PROVIDER *provider_load_cie(sign_cb sign_cb);
++
++/**
++ * Unload the CIE provider.
++ *
++ * @param prov  Provider handle returned by provider_load_cie().
++ */
++void provider_unload_cie(OSSL_PROVIDER *prov);
++
++// ---------------------------------------------------------------------------
++// Key creation
++// ---------------------------------------------------------------------------
++
++/**
++ * Create an EVP_PKEY backed by the CIE provider.
++ *
++ * The returned key contains the RSA public key extracted from the CIE
++ * certificate. When used with EVP_PKEY_sign() / EVP_DigestSign(),
++ * the signing operation is delegated to the smart card via the callback
++ * provided to provider_load_cie().
++ *
++ * Only RSA_PKCS1_PADDING is supported (CIE hardware limitation).
++ *
++ * @param prov  Provider handle returned by provider_load_cie().
++ * @return      EVP_PKEY (caller must free with EVP_PKEY_free()), or NULL.
++ */
++EVP_PKEY *cie_provider_get_pkey(OSSL_PROVIDER *prov);
++
++#endif /* CIEProvider_h */
+diff --git a/cie_sign_sdk/src/CIEEngine.c b/cie_sign_sdk/src/CIEEngine.c
+index 2c454d1..9594f86 100644
+--- a/cie_sign_sdk/src/CIEEngine.c
++++ b/cie_sign_sdk/src/CIEEngine.c
+@@ -3,10 +3,46 @@
+ //  CIESDK
+ //
+ //  Created by ugo chirico on 26.02.2020.
++//  Updated 2026: OpenSSL 3.x — the ENGINE code is replaced by the
++//                 CIEProvider (see CIEProvider.c / CIEProvider.h).
++//
++//  When building against OpenSSL >= 3.0 the legacy ENGINE API is
++//  completely excluded and engine_load_cie() becomes a thin wrapper
++//  around provider_load_cie().
++//
++//  When building against OpenSSL < 3.0 the original ENGINE code is
++//  preserved unchanged.
+ //
+ 
+ #include <stdio.h>
+ #include <string.h>
++#include <openssl/opensslv.h>
++
++#if OPENSSL_VERSION_NUMBER >= 0x30000000
++/* ---- OpenSSL 3.x path: forward to the Provider ------------------- */
++
++# include "CIEEngine.h"
++# include "CIEProvider.h"
++
++const unsigned char* cie_certificate;
++unsigned long cie_certlen;
++unsigned char* cie_pin;
++unsigned long cie_pinlen;
++unsigned short cie_error;
++
++static OSSL_PROVIDER *g_cie_provider = NULL;
++
++void engine_load_cie(sign sign_cb)
++{
++    if (g_cie_provider != NULL)
++        provider_unload_cie(g_cie_provider);
++
++    g_cie_provider = provider_load_cie(sign_cb);
++}
++
++#else
++/* ---- OpenSSL < 3.0 path: original ENGINE code (unchanged) -------- */
++
+ #include "CIEEngine.h"
+ #include "CIEEngineHelper.h"
+ #include <openssl/engine.h>
+@@ -622,3 +658,5 @@ void engine_load_cie(sign sign_cb)
+     ENGINE_free(toadd);
+     ERR_clear_error();
+ }
++
++#endif /* OPENSSL_VERSION_NUMBER < 0x30000000 */
+diff --git a/cie_sign_sdk/src/CIEProvider.c b/cie_sign_sdk/src/CIEProvider.c
+new file mode 100644
+index 0000000..a861d0b
+--- /dev/null
++++ b/cie_sign_sdk/src/CIEProvider.c
+@@ -0,0 +1,659 @@
++//
++//  CIEProvider.c
++//  CIESDK
++//
++//  OpenSSL 3.x Provider for Italian CIE (Carta d'Identità Elettronica).
++//  Replaces the deprecated ENGINE-based CIEEngine implementation.
++//
++//  Architecture:
++//    - Built-in provider registered via OSSL_PROVIDER_add_builtin()
++//    - Implements RSA keymgmt (key from CIE X.509 certificate)
++//    - Implements RSA signature (routes to smart card via callback)
++//    - DigestInfo construction for SHA-1/256/384/512 (CIE hardware req)
++//
++//  Follows the pattern described in:
++//    https://docs.openssl.org/master/OpenSSLStrategicArchitecture/
++//    https://github.com/openssl/openssl/blob/master/README-PROVIDERS.md
++//
++
++#include "CIEProvider.h"
++
++#include <string.h>
++#include <stdlib.h>
++
++#include <openssl/core_dispatch.h>
++#include <openssl/core_names.h>
++#include <openssl/core_object.h>
++#include <openssl/param_build.h>
++#include <openssl/bn.h>
++#include <openssl/rsa.h>
++#include <openssl/x509.h>
++#include <openssl/evp.h>
++#include <openssl/err.h>
++#include <openssl/provider.h>
++#include <openssl/objects.h>   /* NID_sha1, NID_sha256, ... */
++
++/* ------------------------------------------------------------------ */
++/* Globals — set by caller before provider_load_cie()                  */
++/* ------------------------------------------------------------------ */
++
++/* These are declared 'extern' in CIEProvider.h and also in CIEEngine.c.
++ * They are expected to be linked from the same translation unit scope
++ * (file-scope definitions in CIEEngine.c). */
++/* const unsigned char* cie_certificate;      -- provided by CIEEngine.c */
++/* unsigned long cie_certlen;                 -- provided by CIEEngine.c */
++/* unsigned char* cie_pin;                    -- provided by CIEEngine.c */
++/* unsigned long cie_pinlen;                  -- provided by CIEEngine.c */
++/* unsigned short cie_error;                  -- provided by CIEEngine.c */
++
++#define CIE_CMD_OK  0x9000
++
++/* ------------------------------------------------------------------ */
++/* Static state                                                        */
++/* ------------------------------------------------------------------ */
++
++/** Signing callback — set once via provider_load_cie(). */
++static sign_cb g_sign_cb = NULL;
++
++/** Cached X509 cert (parsed from cie_certificate DER). */
++static X509 *g_x509 = NULL;
++
++/** Cached EVP_PKEY holding RSA public key from the cert. */
++static EVP_PKEY *g_pubkey = NULL;
++
++/** Provider handle returned to the caller. */
++static OSSL_PROVIDER *g_prov = NULL;
++
++/* ------------------------------------------------------------------ */
++/* Forward declarations for dispatch tables                            */
++/* ------------------------------------------------------------------ */
++
++/* --- keymgmt ------------------------------------------------------ */
++
++static void *cie_keymgmt_new(void *provctx);
++static void  cie_keymgmt_free(void *keydata);
++static int   cie_keymgmt_has(const void *keydata, int selection);
++static void *cie_keymgmt_dup(const void *keyfrom);
++static int   cie_keymgmt_get_params(void *keydata, OSSL_PARAM params[]);
++
++/* --- signature ---------------------------------------------------- */
++
++static void *cie_signature_newctx(void *provctx, const char *propq);
++static void  cie_signature_freectx(void *sigctx);
++static int   cie_signature_sign(void *sigctx,
++                                unsigned char *sig, size_t *siglen,
++                                size_t sigsize,
++                                const unsigned char *tbs, size_t tbslen);
++static int   cie_signature_set_ctx_md(void *sigctx,
++                                      const char *mdname,
++                                      const char *mdprops);
++
++/* --- provider ----------------------------------------------------- */
++
++static const OSSL_ALGORITHM *cie_query(void *provctx,
++                                       int operation_id,
++                                       int *no_cache);
++static void cie_teardown(void *provctx);
++
++/* ------------------------------------------------------------------ */
++/* Key context structures                                              */
++/* ------------------------------------------------------------------ */
++
++/** Opaque key object passed between keymgmt and signature operations. */
++typedef struct {
++    RSA   *rsa;        /* RSA public key (owned) */
++    size_t keysize;    /* bytes */
++} CIE_KEY;
++
++/** Signature context — created once per signing operation. */
++typedef struct {
++    CIE_KEY *key;      /* reference (not owned) */
++    int      md_nid;   /* NID_sha256, etc. — set by set_ctx_md  */
++} CIE_SIGCTX;
++
++/* ------------------------------------------------------------------ */
++/* DigestInfo construction (same logic as CIEEngine.c)                 */
++/* ------------------------------------------------------------------ */
++
++/**
++ * Build an ASN.1 DigestInfo structure.
++ *
++ * DigestInfo ::= SEQUENCE {
++ *     digestAlgorithm  AlgorithmIdentifier,
++ *     digest           OCTET STRING
++ * }
++ *
++ * Returns 1 on success, 0 if buffer too small.
++ */
++int makeDigestInfo(int algid,
++                          const unsigned char *pbtDigest,
++                          size_t btDigestLen,
++                          unsigned char *pbtDigestInfo,
++                          size_t *pbtDigestInfoLen)
++{
++    size_t requestedLen;
++
++    switch (algid) {
++    case NID_sha1:
++        requestedLen = 2 + 2 + 9 + 2 + btDigestLen;
++        if (*pbtDigestInfoLen < requestedLen)
++            return 0;
++
++        pbtDigestInfo[0]  = 0x30;
++        pbtDigestInfo[1]  = 2 + 9 + 2 + btDigestLen;
++        pbtDigestInfo[2]  = 0x30;
++        pbtDigestInfo[3]  = 0x09;
++        pbtDigestInfo[4]  = 0x06;
++        pbtDigestInfo[5]  = 0x05;
++        pbtDigestInfo[6]  = 0x2b;
++        pbtDigestInfo[7]  = 0x0e;
++        pbtDigestInfo[8]  = 0x03;
++        pbtDigestInfo[9]  = 0x02;
++        pbtDigestInfo[10] = 0x1a;       /* SHA-1 OID tail */
++        pbtDigestInfo[11] = 0x05;
++        pbtDigestInfo[12] = 0x00;
++        pbtDigestInfo[13] = 0x04;
++        pbtDigestInfo[14] = btDigestLen;
++        memcpy(pbtDigestInfo + 15, pbtDigest, btDigestLen);
++        *pbtDigestInfoLen = requestedLen;
++        break;
++
++    case NID_sha256:
++        requestedLen = 2 + 2 + 9 + 6 + btDigestLen;
++        if (*pbtDigestInfoLen < requestedLen)
++            return 0;
++
++        pbtDigestInfo[0]  = 0x30;
++        pbtDigestInfo[1]  = 2 + 9 + 6 + btDigestLen;
++        pbtDigestInfo[2]  = 0x30;
++        pbtDigestInfo[3]  = 0x0D;
++        pbtDigestInfo[4]  = 0x06;
++        pbtDigestInfo[5]  = 0x09;
++        pbtDigestInfo[6]  = 0x60;
++        pbtDigestInfo[7]  = 0x86;
++        pbtDigestInfo[8]  = 0x48;
++        pbtDigestInfo[9]  = 0x01;
++        pbtDigestInfo[10] = 0x65;
++        pbtDigestInfo[11] = 0x03;
++        pbtDigestInfo[12] = 0x04;
++        pbtDigestInfo[13] = 0x02;
++        pbtDigestInfo[14] = 0x01;
++        pbtDigestInfo[15] = 0x05;
++        pbtDigestInfo[16] = 0x00;
++        pbtDigestInfo[17] = 0x04;
++        pbtDigestInfo[18] = btDigestLen;
++        memcpy(pbtDigestInfo + 19, pbtDigest, btDigestLen);
++        *pbtDigestInfoLen = requestedLen;
++        break;
++
++    case NID_sha384:
++        requestedLen = 2 + 2 + 9 + 6 + btDigestLen;
++        if (*pbtDigestInfoLen < requestedLen)
++            return 0;
++
++        pbtDigestInfo[0]  = 0x30;
++        pbtDigestInfo[1]  = 2 + 9 + 6 + btDigestLen;
++        pbtDigestInfo[2]  = 0x30;
++        pbtDigestInfo[3]  = 0x0D;
++        pbtDigestInfo[4]  = 0x06;
++        pbtDigestInfo[5]  = 0x09;
++        pbtDigestInfo[6]  = 0x60;
++        pbtDigestInfo[7]  = 0x86;
++        pbtDigestInfo[8]  = 0x48;
++        pbtDigestInfo[9]  = 0x01;
++        pbtDigestInfo[10] = 0x65;
++        pbtDigestInfo[11] = 0x03;
++        pbtDigestInfo[12] = 0x04;
++        pbtDigestInfo[13] = 0x02;
++        pbtDigestInfo[14] = 0x02;     /* SHA-384 */
++        pbtDigestInfo[15] = 0x05;
++        pbtDigestInfo[16] = 0x00;
++        pbtDigestInfo[17] = 0x04;
++        pbtDigestInfo[18] = btDigestLen;
++        memcpy(pbtDigestInfo + 19, pbtDigest, btDigestLen);
++        *pbtDigestInfoLen = requestedLen;
++        break;
++
++    case NID_sha512:
++        requestedLen = 2 + 2 + 9 + 6 + btDigestLen;
++        if (*pbtDigestInfoLen < requestedLen)
++            return 0;
++
++        pbtDigestInfo[0]  = 0x30;
++        pbtDigestInfo[1]  = 2 + 9 + 6 + btDigestLen;
++        pbtDigestInfo[2]  = 0x30;
++        pbtDigestInfo[3]  = 0x0D;
++        pbtDigestInfo[4]  = 0x06;
++        pbtDigestInfo[5]  = 0x09;
++        pbtDigestInfo[6]  = 0x60;
++        pbtDigestInfo[7]  = 0x86;
++        pbtDigestInfo[8]  = 0x48;
++        pbtDigestInfo[9]  = 0x01;
++        pbtDigestInfo[10] = 0x65;
++        pbtDigestInfo[11] = 0x03;
++        pbtDigestInfo[12] = 0x04;
++        pbtDigestInfo[13] = 0x02;
++        pbtDigestInfo[14] = 0x03;     /* SHA-512 */
++        pbtDigestInfo[15] = 0x05;
++        pbtDigestInfo[16] = 0x00;
++        pbtDigestInfo[17] = 0x04;
++        pbtDigestInfo[18] = btDigestLen;
++        memcpy(pbtDigestInfo + 19, pbtDigest, btDigestLen);
++        *pbtDigestInfoLen = requestedLen;
++        break;
++    }
++
++    return 1;
++}
++
++/* ================================================================== */
++/*  KEYMGMT  —  RSA key management                                    */
++/* ================================================================== */
++
++static void *cie_keymgmt_new(void *provctx)
++{
++    CIE_KEY *key = OPENSSL_zalloc(sizeof(*key));
++    if (key == NULL)
++        return NULL;
++
++    /* Clone the RSA public key from the cached g_pubkey */
++    if (g_pubkey != NULL) {
++        RSA *orig_rsa = EVP_PKEY_get0_RSA(g_pubkey);
++        if (orig_rsa != NULL) {
++            key->rsa = RSAPublicKey_dup(orig_rsa);
++            if (key->rsa != NULL)
++                key->keysize = RSA_size(key->rsa);
++        }
++    }
++
++    return key;
++}
++
++static void cie_keymgmt_free(void *keydata)
++{
++    CIE_KEY *key = (CIE_KEY *)keydata;
++    if (key != NULL) {
++        RSA_free(key->rsa);
++        OPENSSL_free(key);
++    }
++}
++
++static int cie_keymgmt_has(const void *keydata, int selection)
++{
++    const CIE_KEY *key = (const CIE_KEY *)keydata;
++    int ok = 0;
++
++    if (key == NULL || key->rsa == NULL)
++        return 0;
++
++    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
++        ok = 1;
++
++    /* CIE card never exposes the private key; we only have the public
++     * half.  But we report "has keypair" so that EVP_PKEY_sign()
++     * dispatches to our signature implementation.  Without this the
++     * provider's signature entry is never reached. */
++    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
++        ok = 1;
++
++    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
++        ok = 1;
++
++    return ok;
++}
++
++static void *cie_keymgmt_dup(const void *keyfrom)
++{
++    const CIE_KEY *src = (const CIE_KEY *)keyfrom;
++    CIE_KEY *dst;
++
++    if (src == NULL)
++        return NULL;
++
++    dst = OPENSSL_zalloc(sizeof(*dst));
++    if (dst == NULL)
++        return NULL;
++
++    if (src->rsa != NULL) {
++        dst->rsa = RSAPublicKey_dup(src->rsa);
++        if (dst->rsa == NULL) {
++            OPENSSL_free(dst);
++            return NULL;
++        }
++        dst->keysize = src->keysize;
++    }
++
++    return dst;
++}
++
++static int cie_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
++{
++    CIE_KEY *key = (CIE_KEY *)keydata;
++    OSSL_PARAM *p;
++
++    if (key == NULL)
++        return 0;
++
++    p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS);
++    if (p != NULL && !OSSL_PARAM_set_int(p, RSA_bits(key->rsa)))
++        return 0;
++
++    p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE);
++    if (p != NULL && !OSSL_PARAM_set_int(p, RSA_size(key->rsa)))
++        return 0;
++
++    p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS);
++    if (p != NULL && !OSSL_PARAM_set_int(p, RSA_security_bits(key->rsa)))
++        return 0;
++
++    return 1;
++}
++
++/* Keymgmt dispatch table */
++static const OSSL_DISPATCH cie_keymgmt_fns[] = {
++    { OSSL_FUNC_KEYMGMT_NEW,        (void (*)(void))cie_keymgmt_new        },
++    { OSSL_FUNC_KEYMGMT_FREE,       (void (*)(void))cie_keymgmt_free       },
++    { OSSL_FUNC_KEYMGMT_HAS,        (void (*)(void))cie_keymgmt_has        },
++    { OSSL_FUNC_KEYMGMT_DUP,        (void (*)(void))cie_keymgmt_dup        },
++    { OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))cie_keymgmt_get_params },
++    { 0, NULL }
++};
++
++/* ================================================================== */
++/*  SIGNATURE  —  RSA signing (PKCS#1 v1.5 only)                      */
++/* ================================================================== */
++
++static void *cie_signature_newctx(void *provctx, const char *propq)
++{
++    CIE_SIGCTX *ctx = OPENSSL_zalloc(sizeof(*ctx));
++    if (ctx == NULL)
++        return NULL;
++    ctx->md_nid = NID_sha256;   /* safe default */
++    return ctx;
++}
++
++static void cie_signature_freectx(void *sigctx)
++{
++    CIE_SIGCTX *ctx = (CIE_SIGCTX *)sigctx;
++    OPENSSL_free(ctx);
++}
++
++static int cie_signature_set_ctx_md(void *sigctx,
++                                    const char *mdname,
++                                    const char *mdprops)
++{
++    CIE_SIGCTX *ctx = (CIE_SIGCTX *)sigctx;
++    int nid;
++
++    if (ctx == NULL || mdname == NULL)
++        return 0;
++
++    nid = OBJ_sn2nid(mdname);
++    if (nid == NID_undef)
++        nid = OBJ_ln2nid(mdname);
++    if (nid == NID_undef)
++        return 0;
++
++    ctx->md_nid = nid;
++    return 1;
++}
++
++/**
++ * OpenSSL >= 3.5 removed OSSL_FUNC_SIGNATURE_SET_CTX_MD.
++ * The digest is now communicated via OSSL_PARAM (OSSL_SIGNATURE_PARAM_DIGEST).
++ */
++static int cie_signature_set_ctx_params(void *sigctx,
++                                        const OSSL_PARAM params[])
++{
++    CIE_SIGCTX *ctx = (CIE_SIGCTX *)sigctx;
++    const OSSL_PARAM *p;
++
++    if (ctx == NULL)
++        return 0;
++
++    p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST);
++    if (p != NULL) {
++        char buf[64] = {0};
++        char *pbuf = buf;
++        if (OSSL_PARAM_get_utf8_string(p, &pbuf, sizeof(buf))) {
++            int nid = OBJ_sn2nid(buf);
++            if (nid == NID_undef)
++                nid = OBJ_ln2nid(buf);
++            if (nid != NID_undef)
++                ctx->md_nid = nid;
++        }
++    }
++
++    return 1;
++}
++
++/**
++ * Core signing operation.
++ *
++ * The OpenSSL digest pipeline hashing the message and calls us with the
++ * raw digest in @p tbs.  We construct a DigestInfo structure (required
++ * by CIE smart-card firmware) and delegate the actual RSA operation to
++ * the smart card via the caller-supplied g_sign_cb callback.
++ */
++static int cie_signature_sign(void *sigctx,
++                              unsigned char *sig, size_t *siglen,
++                              size_t sigsize,
++                              const unsigned char *tbs, size_t tbslen)
++{
++    CIE_SIGCTX *ctx = (CIE_SIGCTX *)sigctx;
++    unsigned char digestinfo[256];
++    size_t digestinfolen = sizeof(digestinfo);
++    short ret;
++
++    if (ctx == NULL || g_sign_cb == NULL)
++        return 0;
++
++    /* Build ASN.1 DigestInfo */
++    if (!makeDigestInfo(ctx->md_nid, tbs, tbslen,
++                        digestinfo, &digestinfolen)) {
++        return 0;   /* buffer too small — shouldn't happen */
++    }
++
++    /* Delegate to the smart card */
++    ret = g_sign_cb(digestinfo, digestinfolen, sig, siglen) & 0x0000FFFF;
++
++    if (ret != CIE_CMD_OK) {
++        cie_error = ret;
++        return 0;   /* signing failed */
++    }
++
++    cie_error = 0;
++    return 1;
++}
++
++/* Signature dispatch table */
++static const OSSL_DISPATCH cie_signature_fns[] = {
++    { OSSL_FUNC_SIGNATURE_NEWCTX,          (void (*)(void))cie_signature_newctx          },
++    { OSSL_FUNC_SIGNATURE_FREECTX,         (void (*)(void))cie_signature_freectx         },
++    { OSSL_FUNC_SIGNATURE_SIGN,            (void (*)(void))cie_signature_sign            },
++    { OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS,  (void (*)(void))cie_signature_set_ctx_params  },
++#ifdef OSSL_FUNC_SIGNATURE_SET_CTX_MD
++    { OSSL_FUNC_SIGNATURE_SET_CTX_MD,      (void (*)(void))cie_signature_set_ctx_md      },
++#endif
++    { 0, NULL }
++};
++
++/* ================================================================== */
++/*  PROVIDER  —  registration & lifecycle                             */
++/* ================================================================== */
++
++/** Algorithms we advertise. */
++static const OSSL_ALGORITHM cie_keymgmt_algs[] = {
++    { "RSA:rsaEncryption", "provider=cie", cie_keymgmt_fns,
++      "CIE RSA Key Management" },
++    { NULL, NULL, NULL, NULL }
++};
++
++static const OSSL_ALGORITHM cie_signature_algs[] = {
++    { "RSA:rsaEncryption", "provider=cie", cie_signature_fns,
++      "CIE RSA Signature (PKCS#1 v1.5)" },
++    { NULL, NULL, NULL, NULL }
++};
++
++static const OSSL_ALGORITHM *cie_query(void *provctx,
++                                       int operation_id,
++                                       int *no_cache)
++{
++    *no_cache = 0;
++    switch (operation_id) {
++    case OSSL_OP_KEYMGMT:
++        return cie_keymgmt_algs;
++    case OSSL_OP_SIGNATURE:
++        return cie_signature_algs;
++    }
++    return NULL;
++}
++
++static void cie_teardown(void *provctx)
++{
++    /* Nothing to clean up in the provider context itself. */
++}
++
++/* Provider dispatch table */
++static const OSSL_DISPATCH cie_provider_fns[] = {
++    { OSSL_FUNC_PROVIDER_TEARDOWN, (void (*)(void))cie_teardown },
++    { OSSL_FUNC_PROVIDER_QUERY_OPERATION, (void (*)(void))cie_query },
++    { 0, NULL }
++};
++
++/**
++ * Provider initialisation entry point — called by OSSL_PROVIDER_add_builtin().
++ */
++static int cie_provider_init(const OSSL_CORE_HANDLE *handle,
++                             const OSSL_DISPATCH *in,
++                             const OSSL_DISPATCH **out,
++                             void **provctx)
++{
++    /* provctx is unused — we pass NULL through. */
++    *provctx = NULL;
++    *out = cie_provider_fns;
++    return 1;
++}
++
++/* ================================================================== */
++/*  PUBLIC API                                                         */
++/* ================================================================== */
++
++/**
++ * Load the CIE provider and register it with OpenSSL.
++ *
++ * 1. Parses the X.509 certificate from the global cie_certificate.
++ * 2. Adds the provider as a built-in.
++ * 3. Loads (activates) it in the default library context.
++ * 4. Returns a handle that must be passed to provider_unload_cie().
++ */
++OSSL_PROVIDER *provider_load_cie(sign_cb sign_fn)
++{
++    const unsigned char *p;
++
++    if (sign_fn == NULL)
++        return NULL;
++
++    /* Cache the signing callback */
++    g_sign_cb = sign_fn;
++
++    /* Parse the DER certificate (global cie_certificate / cie_certlen) */
++    if (cie_certificate != NULL && cie_certlen > 0) {
++        p = cie_certificate;
++        g_x509 = d2i_X509(NULL, &p, cie_certlen);
++        if (g_x509 != NULL) {
++            g_pubkey = X509_get_pubkey(g_x509);
++            if (g_pubkey == NULL) {
++                X509_free(g_x509);
++                g_x509 = NULL;
++            }
++        }
++    }
++
++    /* Register the built-in provider.
++     * Name "cie" — matches property string "provider=cie" in algorithms. */
++    if (!OSSL_PROVIDER_add_builtin(NULL, "cie", cie_provider_init)) {
++        ERR_clear_error();
++        return NULL;
++    }
++
++    /* Activate it */
++    g_prov = OSSL_PROVIDER_load(NULL, "cie");
++    if (g_prov == NULL) {
++        ERR_clear_error();
++        return NULL;
++    }
++
++    return g_prov;
++}
++
++/**
++ * Unload the CIE provider and release all resources.
++ */
++void provider_unload_cie(OSSL_PROVIDER *prov)
++{
++    if (prov != NULL) {
++        OSSL_PROVIDER_unload(prov);
++    }
++
++    /* Clean up cached objects */
++    if (g_pubkey != NULL) {
++        EVP_PKEY_free(g_pubkey);
++        g_pubkey = NULL;
++    }
++    if (g_x509 != NULL) {
++        X509_free(g_x509);
++        g_x509 = NULL;
++    }
++
++    g_sign_cb = NULL;
++    g_prov = NULL;
++}
++
++/**
++ * Create an EVP_PKEY backed by the CIE provider.
++ *
++ * The returned EVP_PKEY uses the "cie" provider for RSA signing.
++ * Caller must free with EVP_PKEY_free().
++ */
++EVP_PKEY *cie_provider_get_pkey(OSSL_PROVIDER *prov)
++{
++    EVP_PKEY *pkey = NULL;
++    EVP_PKEY_CTX *ctx = NULL;
++    (void)prov;  /* not needed — we use the default library context */
++
++    if (g_pubkey == NULL) {
++        /* Fallback: try to create from certificate directly */
++        if (cie_certificate != NULL && cie_certlen > 0) {
++            const unsigned char *p = cie_certificate;
++            X509 *x509 = d2i_X509(NULL, &p, cie_certlen);
++            if (x509 != NULL) {
++                g_pubkey = X509_get_pubkey(x509);
++                X509_free(x509);
++            }
++        }
++    }
++
++    if (g_pubkey == NULL)
++        return NULL;
++
++    /* Create an EVP_PKEY from the RSA key, then associate it
++     * with the CIE provider via EVP_PKEY_CTX. */
++    RSA *rsa = EVP_PKEY_get0_RSA(g_pubkey);
++    if (rsa == NULL)
++        return NULL;
++
++    pkey = EVP_PKEY_new();
++    if (pkey == NULL)
++        return NULL;
++
++    /* Dup the RSA key into the new EVP_PKEY */
++    RSA *rsa_dup = RSAPublicKey_dup(rsa);
++    if (rsa_dup == NULL || !EVP_PKEY_assign_RSA(pkey, rsa_dup)) {
++        RSA_free(rsa_dup);
++        EVP_PKEY_free(pkey);
++        return NULL;
++    }
++
++    return pkey;
++}
+-- 
+2.54.0
+
